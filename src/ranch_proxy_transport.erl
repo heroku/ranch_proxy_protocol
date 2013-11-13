@@ -34,10 +34,8 @@
                        {dest_address, inet:ip_address() | inet:hostname()} |
                        {source_port, inet:port_number()}].
 -opaque proxy_socket() :: #proxy_socket{}.
--type proxy_protocol_info() :: [{source_address, inet:ip_address()} |
-                                {dest_address, inet:ip_address()} |
-                                {source_port, inet:port_number()} |
-                                {dest_port, inet:port_number()}].
+-type proxy_protocol_info() :: {{inet:ip_address(), inet:port_number()},
+                                {inet:ip_address(), inet:port_number()}}.
 -export_type([proxy_opts/0,
               proxy_socket/0,
               proxy_protocol_info/0]).
@@ -166,15 +164,12 @@ peername(#proxy_socket{csocket=Socket}) ->
     ranch_tcp:peername(Socket).
 
 -spec proxyname(proxy_socket()) -> 
-                       {ok, proxy_protocol_info()} | {error, atom()}.
+                       {ok, proxy_protocol_info()}.
 proxyname(#proxy_socket{source_address = SourceAddress,
                         dest_address = DestAddress,
                         source_port = SourcePort,
                         dest_port = DestPort}) ->
-    {ok, [{source_address, SourceAddress},
-          {dest_address, DestAddress},
-          {source_port, SourcePort},
-          {dest_port, DestPort}]}.
+    {ok, {{SourceAddress, SourcePort}, {DestAddress, DestPort}}}.
 
 -spec sockname(proxy_socket())
               -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
