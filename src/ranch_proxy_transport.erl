@@ -70,19 +70,15 @@ accept(#proxy_socket{lsocket = LSocket,
                 {_, _Sock, <<"PROXY ", ProxyInfo/binary>>} ->
                     case parse_proxy_protocol(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
-                            setopts(ProxySocket, ranch:filter_options(Opts, [backlog, ip, nodelay, port, raw],
-                                                                      [binary, {active, false}, {packet, raw},
-                                                                       {reuseaddr, true}, {nodelay, true}])),
+                            reset_socket_opts(ProxySocket, Opts),
                             {ok, ProxySocket#proxy_socket{inet_version = InetVersion,
                                                           source_address = SourceAddress,
                                                           dest_address = DestAddress,
                                                           source_port = SourcePort,
                                                           dest_port = DestPort}};
                         unknown_peer ->
-                            setopts(ProxySocket, ranch:filter_options(Opts, [backlog, ip, nodelay, port, raw],
-                                                                      [binary, {active, false}, {packet, raw},
-                                                                       {reuseaddr, true}, {nodelay, true}])),
-                                {ok, ProxySocket};
+                            reset_socket_opts(ProxySocket, Opts),
+                            {ok, ProxySocket};
                         not_proxy_protocol ->
                             {error, not_proxy_protocol}
                     end;
@@ -249,3 +245,8 @@ parse_ips([Ip|Ips], Retval) ->
         _ ->
             {error, invalid_address}
     end.
+
+reset_socket_opts(ProxySocket, Opts) ->
+    setopts(ProxySocket, ranch:filter_options(Opts, [backlog, ip, nodelay, port, raw],
+                                              [binary, {active, false}, {packet, raw},
+                                               {reuseaddr, true}, {nodelay, true}])).
