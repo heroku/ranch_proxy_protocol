@@ -28,10 +28,9 @@
 -export([sockname/1]).
 -export([close/1]).
 
--type proxy_opts() :: [{inet_version, ipv4 | ipv6} |
-                       {source_address, inet:ip_address() | inet:hostname()} |
+-type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
-                       {dest_address, inet:ip_address() | inet:hostname()} |
+                       {dest_address, inet:ip_address()} |
                        {source_port, inet:port_number()}].
 -opaque proxy_socket() :: #proxy_socket{}.
 -type proxy_protocol_info() :: {{inet:ip_address(), inet:port_number()},
@@ -103,12 +102,11 @@ connect(Host, Port, Opts, ProxyOpts) when is_integer(Port) ->
     case ranch_tcp:connect(Host, Port, Opts) of
         {ok, Socket} ->
             ProxySocket = #proxy_socket{csocket = Socket},
-            Protocol = proplists:get_value(inet_version, ProxyOpts),
             SourceAddress = proplists:get_value(source_address, ProxyOpts),
             DestAddress = proplists:get_value(dest_address, ProxyOpts),
             SourcePort = proplists:get_value(source_port, ProxyOpts),
             DestPort = proplists:get_value(dest_port, ProxyOpts),
-            case create_proxy_protocol_header(Protocol, SourceAddress, DestAddress, SourcePort, DestPort) of
+            case create_proxy_protocol_header(SourceAddress, DestAddress, SourcePort, DestPort) of
                 {ok, ProxyHeader} ->
                     ranch_tcp:send(Socket, ProxyHeader),
                     {ok, ProxySocket#proxy_socket{source_address = SourceAddress,
@@ -181,21 +179,30 @@ close(#proxy_socket{csocket=Socket}) ->
     ranch_tcp:close(Socket).
 
 % Internal
-create_proxy_protocol_header(Proto, SourceAddress, DestAddress, SourcePort, DestPort) when is_tuple(SourceAddress),
-                                                                                           is_tuple(DestAddress),
-                                                                                           is_integer(SourcePort),
-                                                                                           is_integer(DestPort) ->
+create_proxy_protocol_header(SourceAddress, DestAddress, SourcePort, DestPort) when is_tuple(SourceAddress),
+                                                                                    is_tuple(DestAddress),
+                                                                                    is_integer(SourcePort),
+                                                                                    is_integer(DestPort) ->
+    Proto = get_protocol(SourceAddress, DestAddress),
     SourceAddressStr = inet_parse:ntoa(SourceAddress),
     DestAddressStr = inet_parse:ntoa(DestAddress),
     SourcePortString = integer_to_list(SourcePort),
     DestPortString = integer_to_list(DestPort),
-    create_proxy_protocol_header(Proto, SourceAddressStr, DestAddressStr, SourcePortString, DestPortString);
+    create_proxy_protocol_header(Proto, SourceAddressStr, DestAddressStr, SourcePortString, DestPortString).
+
 create_proxy_protocol_header(ipv4, SourceAddress, DestAddress, SourcePort, DestPort) ->
     {ok, io_lib:format("PROXY TCP4 ~s ~s ~s ~s\r\n", [SourceAddress, DestAddress, SourcePort, DestPort])};
 create_proxy_protocol_header(ipv6, SourceAddress, DestAddress, SourcePort, DestPort) ->
     {ok, io_lib:format("PROXY TCP6 ~s ~s ~s ~s\r\n", [SourceAddress, DestAddress, SourcePort, DestPort])};
 create_proxy_protocol_header(_, _, _, _, _) ->
     {error, invalid_proxy_information}.
+
+get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 8,
+                                              size(DestAddress) =:= 8 ->
+    ipv6;
+get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 4,
+                                              size(DestAddress) =:= 4 ->
+    ipv4.
 
 parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
     InfoStr= binary_to_list(Info),

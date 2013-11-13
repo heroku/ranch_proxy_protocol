@@ -50,11 +50,8 @@ new_connection(Config) ->
                                    [binary, {active, false}, {packet, raw}]),
     ok = gen_tcp:send(Socket, "PROXY TCP4 192.168.1.1 192.168.1.2 80 81\r\n"),
     receive
-        Proplist ->
-            {192,168,1,1} = proplists:get_value(source_address, Proplist),
-            {192,168,1,2} = proplists:get_value(dest_address, Proplist),
-            80 = proplists:get_value(source_port, Proplist),
-            81 = proplists:get_value(dest_port, Proplist)
+        X ->
+            {{{192,168,1,1}, 80}, {{192,168,1,2}, 81}} = X
     end,
     Config.
 
@@ -67,11 +64,8 @@ proxy_connect(Config) ->
                                                    {source_port, 82},
                                                    {dest_port, 83}]),
     receive
-        Proplist ->
-            {192,168,0,3} = proplists:get_value(source_address, Proplist),
-            {192,168,0,4} = proplists:get_value(dest_address, Proplist),
-            82 = proplists:get_value(source_port, Proplist),
-            83 = proplists:get_value(dest_port, Proplist)
+        X ->
+            {{{192,168,0,3}, 82}, {{192,168,0,4}, 83}} = X
     end,
     Config.
 
@@ -84,25 +78,18 @@ reuse_socket(Config) ->
                                                   {source_port, 82},
                                                   {dest_port, 83}]),
     receive
-        Proplist ->
-            {192,168,0,3} = proplists:get_value(source_address, Proplist),
-            {192,168,0,4} = proplists:get_value(dest_address, Proplist),
-            82 = proplists:get_value(source_port, Proplist),
-            83 = proplists:get_value(dest_port, Proplist)
+        X ->
+            {{{192,168,0,3}, 82}, {{192,168,0,4}, 83}} = X
     end,
-    ranch_proxy_protocol:close(Socket),
+    ranch_proxy_transport:close(Socket),
     {ok, Socket1} = ranch_proxy_transport:connect({127,0,0,1}, Port, [],
-                                                  [{inet_version, ipv4},
-                                                   {source_address, {192,168,0,5}},
+                                                  [{source_address, {192,168,0,5}},
                                                    {dest_address, {192,168,0,6}},
                                                    {source_port, 84},
                                                    {dest_port, 85}]),
     receive
-        Proplist1 ->
-            {192,168,0,5} = proplists:get_value(source_address, Proplist1),
-            {192,168,0,6} = proplists:get_value(dest_address, Proplist1),
-            84 = proplists:get_value(source_port, Proplist1),
-            85 = proplists:get_value(dest_port, Proplist1)
+        X1 ->
+            {{{192,168,0,5}, 84}, {{192,168,0,6}, 85}} = X1
     end,
     ranch_proxy_transport:close(Socket1),
     Config.
