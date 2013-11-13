@@ -15,7 +15,7 @@ init_per_testcase(new_connection, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
-                                     ranch_proxy_protocol,
+                                     ranch_proxy_protocol_transport,
                                      [{port, Port}],
                                      ranch_proxy_protocol_test_protocol, [{tester, self()}]),
     [{port, Port},
@@ -60,12 +60,12 @@ new_connection(Config) ->
 
 proxy_connect(Config) ->
     Port = ?config(port, Config),
-    {ok, _Socket} = ranch_proxy_protocol:connect({127,0,0,1}, Port, [],
-                                                 [{inet_version, ipv4},
-                                                  {source_address, {192,168,0,3}},
-                                                  {dest_address, {192,168,0,4}},
-                                                  {source_port, 82},
-                                                  {dest_port, 83}]),
+    {ok, _Socket} = ranch_proxy_protocol_transport:connect({127,0,0,1}, Port, [],
+                                                           [{inet_version, ipv4},
+                                                            {source_address, {192,168,0,3}},
+                                                            {dest_address, {192,168,0,4}},
+                                                            {source_port, 82},
+                                                            {dest_port, 83}]),
     receive
         Proplist ->
             {192,168,0,3} = proplists:get_value(source_address, Proplist),
@@ -77,12 +77,12 @@ proxy_connect(Config) ->
 
 reuse_socket(Config) ->
     Port = ?config(port, Config),
-    {ok, Socket} = ranch_proxy_protocol:connect({127,0,0,1}, Port, [],
-                                                 [{inet_version, ipv4},
-                                                  {source_address, {192,168,0,3}},
-                                                  {dest_address, {192,168,0,4}},
-                                                  {source_port, 82},
-                                                  {dest_port, 83}]),
+    {ok, Socket} = ranch_proxy_protocol_transport:connect({127,0,0,1}, Port, [],
+                                                          [{inet_version, ipv4},
+                                                           {source_address, {192,168,0,3}},
+                                                           {dest_address, {192,168,0,4}},
+                                                           {source_port, 82},
+                                                           {dest_port, 83}]),
     receive
         Proplist ->
             {192,168,0,3} = proplists:get_value(source_address, Proplist),
@@ -91,12 +91,12 @@ reuse_socket(Config) ->
             83 = proplists:get_value(dest_port, Proplist)
     end,
     ranch_proxy_protocol:close(Socket),
-    {ok, Socket1} = ranch_proxy_protocol:connect({127,0,0,1}, Port, [],
-                                                 [{inet_version, ipv4},
-                                                  {source_address, {192,168,0,5}},
-                                                  {dest_address, {192,168,0,6}},
-                                                  {source_port, 84},
-                                                  {dest_port, 85}]),
+    {ok, Socket1} = ranch_proxy_protocol_transport:connect({127,0,0,1}, Port, [],
+                                                           [{inet_version, ipv4},
+                                                            {source_address, {192,168,0,5}},
+                                                            {dest_address, {192,168,0,6}},
+                                                            {source_port, 84},
+                                                            {dest_port, 85}]),
     receive
         Proplist1 ->
             {192,168,0,5} = proplists:get_value(source_address, Proplist1),

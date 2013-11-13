@@ -1,4 +1,4 @@
--module(ranch_proxy_protocol).
+-module(ranch_proxy_protocol_transport).
 -behaviour(ranch_transport).
 
 -record(proxy_socket, { lsocket :: inet:socket(),
