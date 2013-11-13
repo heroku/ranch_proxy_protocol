@@ -1,6 +1,6 @@
 {application, ranch_proxy_protocol,
  [
-  {description, "Ranch Proxy Protocol Tranport"},
+  {description, "Ranch Proxy Protocol Transport"},
   {vsn, "0.0.1"},
   {registered, []},
   {applications, [
