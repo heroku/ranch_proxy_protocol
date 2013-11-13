@@ -1,0 +1,12 @@
+{application, ranch_proxy_protocol,
+ [
+  {description, "Ranch Proxy Protocol Tranport"},
+  {vsn, "0.0.1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  ranch
+                 ]},
+  {env, []}
+ ]}.
