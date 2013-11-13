@@ -57,7 +57,8 @@ listen(Opts) ->
     end.
 
 -spec accept(proxy_socket(), timeout())
-            -> {ok, proxy_socket()} | {error, closed | timeout | not_proxy_protocol | atom()}.
+            -> {ok, proxy_socket()} | {error, closed | timeout | not_proxy_protocol |
+                                       {timeout, proxy_handshake} | atom()}.
 accept(#proxy_socket{lsocket = LSocket,
                      opts = Opts}, Timeout) ->
     case ranch_tcp:accept(LSocket, Timeout) of 
@@ -84,8 +85,8 @@ accept(#proxy_socket{lsocket = LSocket,
                     end;
                 Other ->
                     {error, Other}
-            after 5000 ->
-                    {error, timeout}
+            after Timeout ->
+                    {error, {timeout, proxy_handshake}}
             end;
         {error, Error} ->
             {error, Error}
