@@ -68,7 +68,7 @@ accept(#proxy_socket{lsocket = LSocket,
                                          opts = Opts },
             ok = setopts(ProxySocket, [{active, once}, {packet, line}]),
             receive
-                {_, _Sock, <<"PROXY ", ProxyInfo/binary>>} ->
+                {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
                     case parse_proxy_protocol(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
                             reset_socket_opts(ProxySocket, Opts),
