@@ -58,8 +58,10 @@ listen(Opts) ->
                                        {timeout, proxy_handshake} | atom()}.
 accept(#proxy_socket{lsocket = LSocket,
                      opts = Opts}, Timeout) ->
+    Started = os:timestamp(),
     case ranch_tcp:accept(LSocket, Timeout) of 
         {ok, CSocket} ->
+            NextWait = get_next_timeout(Started, os:timestamp(), Timeout),
             ProxySocket = #proxy_socket{ lsocket = LSocket,
                                          csocket = CSocket,
                                          opts = Opts },
@@ -82,7 +84,7 @@ accept(#proxy_socket{lsocket = LSocket,
                     end;
                 Other ->
                     {error, Other}
-            after Timeout ->
+            after NextWait ->
                     {error, {timeout, proxy_handshake}}
             end;
         {error, Error} ->
@@ -253,3 +255,8 @@ reset_socket_opts(ProxySocket, Opts) ->
     setopts(ProxySocket, ranch:filter_options(Opts, [backlog, ip, nodelay, port, raw],
                                               [binary, {active, false}, {packet, raw},
                                                {reuseaddr, true}, {nodelay, true}])).
+
+get_next_timeout(_, _, infinity) ->
+    infinity;
+get_next_timeout(T1, T2, Timeout) ->
+    timer:now_diff(T1, T2) + Timeout.
