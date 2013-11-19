@@ -261,5 +261,5 @@ reset_socket_opts(ProxySocket, Opts) ->
 get_next_timeout(_, _, infinity) ->
     infinity;
 get_next_timeout(T1, T2, Timeout) ->
-    DiffMs = round(timer:now_diff(T2, T1) / 1000),
-    erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - DiffMs).
+    TimeUsed = round(timer:now_diff(T2, T1) / 1000),
+    erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - TimeUsed).
