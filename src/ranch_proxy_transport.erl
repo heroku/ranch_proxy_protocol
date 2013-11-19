@@ -259,4 +259,4 @@ reset_socket_opts(ProxySocket, Opts) ->
 get_next_timeout(_, _, infinity) ->
     infinity;
 get_next_timeout(T1, T2, Timeout) ->
-    timer:now_diff(T1, T2) + Timeout.
+    Timeout - timer:now_diff(T1, T2).
