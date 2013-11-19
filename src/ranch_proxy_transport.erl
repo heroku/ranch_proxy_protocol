@@ -39,6 +39,8 @@
               proxy_socket/0,
               proxy_protocol_info/0]).
 
+-define(DEFAULT_PROXY_TIMEOUT, 5000).
+
 name() -> proxy_protocol_tcp.
 
 messages() -> ranch_tcp:messages().
@@ -259,4 +261,5 @@ reset_socket_opts(ProxySocket, Opts) ->
 get_next_timeout(_, _, infinity) ->
     infinity;
 get_next_timeout(T1, T2, Timeout) ->
-    Timeout - timer:now_diff(T1, T2).
+    DiffMs = round(timer:now_diff(T2, T1) / 1000),
+    erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - DiffMs).
