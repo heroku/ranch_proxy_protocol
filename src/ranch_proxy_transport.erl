@@ -39,7 +39,7 @@
               proxy_socket/0,
               proxy_protocol_info/0]).
 
--define(DEFAULT_PROXY_TIMEOUT, 5000).
+-define(DEFAULT_PROXY_TIMEOUT, config(proxy_protocol_timeout)).
 
 name() -> proxy_protocol_tcp.
 
@@ -263,3 +263,7 @@ get_next_timeout(_, _, infinity) ->
 get_next_timeout(T1, T2, Timeout) ->
     TimeUsed = round(timer:now_diff(T2, T1) / 1000),
     erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - TimeUsed).
+
+config(Key) ->
+    {ok, Val} = application:get_env(Key),
+    Val.

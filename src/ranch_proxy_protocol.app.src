@@ -8,5 +8,5 @@
                   stdlib,
                   ranch
                  ]},
-  {env, []}
+  {env, [{proxy_protocol_timeout, 100}]}
  ]}.

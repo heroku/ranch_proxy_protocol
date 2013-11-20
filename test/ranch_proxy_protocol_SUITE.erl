@@ -9,6 +9,7 @@ all() ->
 
 init_per_suite(Config) ->
     application:ensure_all_started(ranch),
+    application:load(ranch_proxy_protocol),
     Config.
 
 init_per_testcase(new_connection, Config) ->
