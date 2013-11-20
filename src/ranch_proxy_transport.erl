@@ -204,11 +204,11 @@ create_proxy_protocol_header(ipv6, SourceAddress, DestAddress, SourcePort, DestP
 create_proxy_protocol_header(_, _, _, _, _) ->
     {error, invalid_proxy_information}.
 
-get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 8,
-                                              size(DestAddress) =:= 8 ->
+get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 8,
+                                              tuple_size(DestAddress) =:= 8 ->
     ipv6;
-get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 4,
-                                              size(DestAddress) =:= 4 ->
+get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
+                                              tuple_size(DestAddress) =:= 4 ->
     ipv4.
 
 parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
