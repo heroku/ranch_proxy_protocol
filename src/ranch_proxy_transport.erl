@@ -29,6 +29,8 @@
 -export([close/1]).
 
 -export([opts_from_socket/2]).
+-export([bearer_port/1]).
+
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
                        {dest_address, inet:ip_address()} |
@@ -289,3 +291,5 @@ dest_from_socket(Transport, Socket) ->
                   {dest_port, Port}]};
         Err -> Err
     end.
+
+bearer_port(#proxy_socket{csocket = Port}) -> Port.
