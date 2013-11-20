@@ -245,7 +245,7 @@ parse_ports([Port|Ports], Retval) ->
         error:badarg ->
             {error, invalid_port}
     end.
-        
+
 parse_ips([], Retval) ->
     Retval;
 parse_ips([Ip|Ips], Retval) ->
