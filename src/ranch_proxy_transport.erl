@@ -28,6 +28,7 @@
 -export([sockname/1]).
 -export([close/1]).
 
+-export([opts_from_socket/2]).
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
                        {dest_address, inet:ip_address()} |
@@ -263,3 +264,28 @@ get_next_timeout(_, _, infinity) ->
 get_next_timeout(T1, T2, Timeout) ->
     TimeUsed = round(timer:now_diff(T2, T1) / 1000),
     erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - TimeUsed).
+
+opts_from_socket(Transport, Socket) ->
+    case {source_from_socket(Transport, Socket),
+          dest_from_socket(Transport, Socket)} of
+        {{ok, Src}, {ok, Dst}} ->
+            {ok, Src ++ Dst};
+        {{error, _} = Err, _} -> Err;
+        {_, {error, _} = Err} -> Err
+    end.
+
+source_from_socket(Transport, Socket) ->
+    case Transport:peername(Socket) of
+        {ok, {Addr, Port}} ->
+            {ok, [{source_address, Addr},
+                  {source_port, Port}]};
+        Err -> Err
+    end.
+
+dest_from_socket(Transport, Socket) ->
+    case Transport:sockname(Socket) of
+        {ok, {Addr, Port}} ->
+            {ok, [{dest_address, Addr},
+                  {dest_port, Port}]};
+        Err -> Err
+    end.
