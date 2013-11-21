@@ -28,6 +28,9 @@
 -export([sockname/1]).
 -export([close/1]).
 
+-export([opts_from_socket/2]).
+-export([bearer_port/1]).
+
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
                        {dest_address, inet:ip_address()} |
@@ -201,11 +204,11 @@ create_proxy_protocol_header(ipv6, SourceAddress, DestAddress, SourcePort, DestP
 create_proxy_protocol_header(_, _, _, _, _) ->
     {error, invalid_proxy_information}.
 
-get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 8,
-                                              size(DestAddress) =:= 8 ->
+get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 8,
+                                              tuple_size(DestAddress) =:= 8 ->
     ipv6;
-get_protocol(SourceAddress, DestAddress) when size(SourceAddress) =:= 4,
-                                              size(DestAddress) =:= 4 ->
+get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
+                                              tuple_size(DestAddress) =:= 4 ->
     ipv4.
 
 parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
@@ -242,7 +245,7 @@ parse_ports([Port|Ports], Retval) ->
         error:badarg ->
             {error, invalid_port}
     end.
-        
+
 parse_ips([], Retval) ->
     Retval;
 parse_ips([Ip|Ips], Retval) ->
@@ -263,6 +266,33 @@ get_next_timeout(_, _, infinity) ->
 get_next_timeout(T1, T2, Timeout) ->
     TimeUsed = round(timer:now_diff(T2, T1) / 1000),
     erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - TimeUsed).
+
+opts_from_socket(Transport, Socket) ->
+    case {source_from_socket(Transport, Socket),
+          dest_from_socket(Transport, Socket)} of
+        {{ok, Src}, {ok, Dst}} ->
+            {ok, Src ++ Dst};
+        {{error, _} = Err, _} -> Err;
+        {_, {error, _} = Err} -> Err
+    end.
+
+source_from_socket(Transport, Socket) ->
+    case Transport:peername(Socket) of
+        {ok, {Addr, Port}} ->
+            {ok, [{source_address, Addr},
+                  {source_port, Port}]};
+        Err -> Err
+    end.
+
+dest_from_socket(Transport, Socket) ->
+    case Transport:sockname(Socket) of
+        {ok, {Addr, Port}} ->
+            {ok, [{dest_address, Addr},
+                  {dest_port, Port}]};
+        Err -> Err
+    end.
+
+bearer_port(#proxy_socket{csocket = Port}) -> Port.
 
 config(Key) ->
     {ok, Val} = application:get_env(Key),
