@@ -16,7 +16,7 @@ init_per_testcase(new_connection, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
-                                     ranch_proxy_transport,
+                                     ranch_proxy,
                                      [{port, Port}],
                                      ranch_proxy_protocol_test_protocol, [{tester, self()}]),
     [{port, Port},
@@ -25,7 +25,7 @@ init_per_testcase(proxy_connect, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
-                                     ranch_proxy_transport,
+                                     ranch_proxy,
                                      [{port, Port}],
                                      ranch_proxy_protocol_test_protocol, [{tester, self()}]),
     [{port, Port},
@@ -34,7 +34,7 @@ init_per_testcase(reuse_socket, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
-                                     ranch_proxy_transport,
+                                     ranch_proxy,
                                      [{port, Port}],
                                      ranch_proxy_protocol_test_protocol, [{tester, self()}]),
     [{port, Port},
@@ -58,7 +58,7 @@ new_connection(Config) ->
 
 proxy_connect(Config) ->
     Port = ?config(port, Config),
-    {ok, _Socket} = ranch_proxy_transport:connect({127,0,0,1}, Port, [],
+    {ok, _Socket} = ranch_proxy:connect({127,0,0,1}, Port, [],
                                                   [{inet_version, ipv4},
                                                    {source_address, {192,168,0,3}},
                                                    {dest_address, {192,168,0,4}},
@@ -72,7 +72,7 @@ proxy_connect(Config) ->
 
 reuse_socket(Config) ->
     Port = ?config(port, Config),
-    {ok, Socket} = ranch_proxy_transport:connect({127,0,0,1}, Port, [],
+    {ok, Socket} = ranch_proxy:connect({127,0,0,1}, Port, [],
                                                  [{inet_version, ipv4},
                                                   {source_address, {192,168,0,3}},
                                                   {dest_address, {192,168,0,4}},
@@ -82,8 +82,8 @@ reuse_socket(Config) ->
         X ->
             {{{192,168,0,3}, 82}, {{192,168,0,4}, 83}} = X
     end,
-    ranch_proxy_transport:close(Socket),
-    {ok, Socket1} = ranch_proxy_transport:connect({127,0,0,1}, Port, [],
+    ranch_proxy:close(Socket),
+    {ok, Socket1} = ranch_proxy:connect({127,0,0,1}, Port, [],
                                                   [{source_address, {192,168,0,5}},
                                                    {dest_address, {192,168,0,6}},
                                                    {source_port, 84},
@@ -92,5 +92,5 @@ reuse_socket(Config) ->
         X1 ->
             {{{192,168,0,5}, 84}, {{192,168,0,6}, 85}} = X1
     end,
-    ranch_proxy_transport:close(Socket1),
+    ranch_proxy:close(Socket1),
     Config.

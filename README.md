@@ -7,7 +7,7 @@ This module wraps the `ranch_tcp` module to parse the
 It has the same API as the `ranch_tcp` module but with two new
 functions; `connect/4` and `proxyname/1`.
 
-The transport is called `ranch_proxy_transport`.
+The transport is called `ranch_proxy`.
 
 ## `connect/4`
 
