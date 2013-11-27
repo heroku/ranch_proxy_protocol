@@ -48,3 +48,7 @@ Sure why don't you
 $ rebar get-deps -C rebar.config.test
 $ rebar compile ct skip_deps=true -C rebar.config.test
 ```
+
+# License
+
+See the `LICENSE` file.
