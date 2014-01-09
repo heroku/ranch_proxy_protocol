@@ -257,9 +257,14 @@ parse_ips([Ip|Ips], Retval) ->
     end.
 
 reset_socket_opts(ProxySocket, Opts) ->
-    setopts(ProxySocket, ranch:filter_options(Opts, [backlog, ip, nodelay, port, raw],
-                                              [binary, {active, false}, {packet, raw},
-                                               {reuseaddr, true}, {nodelay, true}])).
+    Opts2 = ranch:filter_options(Opts, [active,buffer,delay_send,deliver,dontroute,
+                                        exit_on_close,header,high_msgq_watermark,
+                                        high_watermark,keepalive,linger,low_msgq_watermark,
+                                        low_watermark,mode,nodelay,packet,packet_size,priority,
+                                        recbuf,reuseaddr,send_timeout,send_timeout_close,sndbuf,tos],
+                                 [binary, {active, false}, {packet, raw},
+                                  {reuseaddr, true}, {nodelay, true}]),
+    setopts(ProxySocket, Opts2).
 
 get_next_timeout(_, _, infinity) ->
     infinity;
