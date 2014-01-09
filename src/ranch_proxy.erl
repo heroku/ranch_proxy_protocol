@@ -212,7 +212,7 @@ get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
     ipv4.
 
 parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
-    InfoStr= binary_to_list(Info),
+    InfoStr = binary_to_list(Info),
     case string:tokens(InfoStr, " \r\n") of
         [SourceAddress, DestAddress, SourcePort, DestPort] ->
             case {parse_inet(Proto), parse_ips([SourceAddress, DestAddress], []),
