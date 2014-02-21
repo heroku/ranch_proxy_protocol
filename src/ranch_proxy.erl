@@ -12,6 +12,7 @@
 
 -export([name/0]).
 -export([messages/0]).
+-export([match_port/1]).
 -export([listen/1]).
 -export([accept/2]).
 -export([connect/3]).
@@ -47,6 +48,9 @@
 name() -> proxy_protocol_tcp.
 
 messages() -> ranch_tcp:messages().
+
+-spec match_port(proxy_socket()) -> port().
+match_port(#proxy_socket{csocket=Port}) when is_port(Port) -> Port.
 
 -spec listen(ranch_tcp:opts()) -> {ok, proxy_socket()} | {error, atom()}.
 listen(Opts) ->
