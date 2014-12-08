@@ -271,7 +271,10 @@ reset_socket_opts(ProxySocket, Opts) ->
     setopts(ProxySocket, Opts2).
 
 get_next_timeout(_, _, infinity) ->
-    infinity;
+    %% Never leave `infinity' in place. This may be valid for socket
+    %% accepts, but is fairly dangrous and risks causing lockups when
+    %% the data over the socket is bad or invalid.
+    ?DEFAULT_PROXY_TIMEOUT;
 get_next_timeout(T1, T2, Timeout) ->
     TimeUsed = round(timer:now_diff(T2, T1) / 1000),
     erlang:max(?DEFAULT_PROXY_TIMEOUT, Timeout - TimeUsed).
@@ -304,5 +307,5 @@ dest_from_socket(Transport, Socket) ->
 bearer_port(#proxy_socket{csocket = Port}) -> Port.
 
 config(Key) ->
-    {ok, Val} = application:get_env(Key),
+    {ok, Val} = application:get_env(ranch_proxy_protocol, Key),
     Val.
