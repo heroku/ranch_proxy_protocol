@@ -45,7 +45,7 @@ a third tuple containing proxy protocol information:
 Sure why don't you
 
 ``` bash
-$ rebar get-deps -C rebar.config.test
+$ rebar get-deps compile -C rebar.config.test
 $ rebar compile ct skip_deps=true -C rebar.config.test
 ```
 

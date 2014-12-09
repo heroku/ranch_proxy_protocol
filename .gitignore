@@ -6,3 +6,5 @@ ebin/
 *.plt
 erl_crash.dump
 logs/
+.rebar
+*.swp

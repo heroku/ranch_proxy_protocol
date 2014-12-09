@@ -8,5 +8,5 @@
                   stdlib,
                   ranch
                  ]},
-  {env, [{proxy_protocol_timeout, 100}]}
+  {env, [{proxy_protocol_timeout, 55000}]} % Never put 'infinity'
  ]}.
