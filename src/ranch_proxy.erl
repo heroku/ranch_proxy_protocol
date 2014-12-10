@@ -89,11 +89,14 @@ accept(#proxy_socket{lsocket = LSocket,
                             reset_socket_opts(ProxySocket, Opts),
                             {ok, ProxySocket};
                         not_proxy_protocol ->
+                            close(ProxySocket),
                             {error, not_proxy_protocol}
                     end;
                 Other ->
+                    close(ProxySocket),
                     {error, Other}
             after NextWait ->
+                    close(ProxySocket),
                     {error, {timeout, proxy_handshake}}
             end;
         {error, Error} ->
