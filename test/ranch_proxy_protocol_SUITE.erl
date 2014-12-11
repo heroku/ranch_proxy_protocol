@@ -43,12 +43,16 @@ init_per_testcase(reuse_socket, Config) ->
 init_per_testcase(fail_not_proxy_clean, Config) ->
     Port = 9401,
     {ok, Listen} = ranch_proxy:listen([{port, Port}]),
+    Acceptor = start_acceptor(Listen),
     [{port, Port},
+     {acceptor, Acceptor},
      {listen, Listen} | Config];
 init_per_testcase(fail_garbage_clean, Config) ->
     Port = 9401,
     {ok, Listen} = ranch_proxy:listen([{port, Port}]),
+    Acceptor = start_acceptor(Listen),
     [{port, Port},
+     {acceptor, Acceptor},
      {listen, Listen} | Config];
 init_per_testcase(fail_timeout_clean, Config) ->
     Port = 9401,
@@ -126,38 +130,24 @@ reuse_socket(Config) ->
 
 fail_not_proxy_clean(Config) ->
     Port = ?config(port, Config),
-    Listen = ?config(listen, Config),
-    Parent = self(),
-    Acceptor = spawn_link(fun() ->
-        Parent ! {self(), ranch_proxy:accept(Listen, infinity)},
-        timer:sleep(infinity)
-    end),
+    Acceptor = ?config(acceptor, Config),
     {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
     gen_tcp:send(Conn, <<"PROXY GARBAGE\r\n">>),
     receive
         {Acceptor, {error, not_proxy_protocol}} ->
-            {links, Links} = process_info(Acceptor, links),
-            Ports = [P || P <- Links, is_port(P)],
-            [] = Ports
+            [] = ports(Acceptor)
     after 5000 ->
         error(timeout)
     end.
 
 fail_garbage_clean(Config) ->
     Port = ?config(port, Config),
-    Listen = ?config(listen, Config),
-    Parent = self(),
-    Acceptor = spawn_link(fun() ->
-        Parent ! {self(), ranch_proxy:accept(Listen, infinity)},
-        timer:sleep(infinity)
-    end),
+    Acceptor = ?config(acceptor, Config),
     {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
     gen_tcp:send(Conn, <<"garbage data\r\n">>),
     receive
         {Acceptor, {error, {tcp, _, _}}} ->
-            {links, Links} = process_info(Acceptor, links),
-            Ports = [P || P <- Links, is_port(P)],
-            [] = Ports
+            [] = ports(Acceptor)
     after 5000 ->
         error(timeout)
     end.
@@ -165,18 +155,25 @@ fail_garbage_clean(Config) ->
 fail_timeout_clean(Config) ->
     Port = ?config(port, Config),
     Listen = ?config(listen, Config),
-    Parent = self(),
-    Acceptor = spawn_link(fun() ->
-        Parent ! {self(), ranch_proxy:accept(Listen, infinity)},
-        timer:sleep(infinity)
-    end),
+    Acceptor = start_acceptor(Listen),
     {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
     gen_tcp:send(Conn, <<"garbage data">>), % no CLRF may wait forever
     receive
         {Acceptor, {error, {timeout, proxy_handshake}}} ->
-            {links, Links} = process_info(Acceptor, links),
-            Ports = [P || P <- Links, is_port(P)],
-            [] = Ports
+            [] = ports(Acceptor)
     after 5000 ->
         error(timeout)
     end.
+
+
+%%% Helpers %%%
+start_acceptor(Listen) ->
+    Parent = self(),
+    spawn_link(fun() ->
+        Parent ! {self(), ranch_proxy:accept(Listen, infinity)},
+        timer:sleep(infinity)
+    end).
+
+ports(Proc) ->
+    {links, Links} = process_info(Proc, links),
+    [P || P <- Links, is_port(P)].
