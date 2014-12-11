@@ -5,7 +5,8 @@
 
 all() ->
     [ new_connection, proxy_connect,
-      reuse_socket ].
+      reuse_socket, fail_not_proxy_clean,
+      fail_garbage_clean, fail_timeout_clean ].
 
 init_per_suite(Config) ->
     application:ensure_all_started(ranch),
@@ -38,8 +39,40 @@ init_per_testcase(reuse_socket, Config) ->
                                      [{port, Port}],
                                      ranch_proxy_protocol_test_protocol, [{tester, self()}]),
     [{port, Port},
-     {listeners, Pid} | Config].
+     {listeners, Pid} | Config];
+init_per_testcase(fail_not_proxy_clean, Config) ->
+    Port = 9401,
+    {ok, Listen} = ranch_proxy:listen([{port, Port}]),
+    Acceptor = start_acceptor(Listen),
+    [{port, Port},
+     {acceptor, Acceptor},
+     {listen, Listen} | Config];
+init_per_testcase(fail_garbage_clean, Config) ->
+    Port = 9401,
+    {ok, Listen} = ranch_proxy:listen([{port, Port}]),
+    Acceptor = start_acceptor(Listen),
+    [{port, Port},
+     {acceptor, Acceptor},
+     {listen, Listen} | Config];
+init_per_testcase(fail_timeout_clean, Config) ->
+    Port = 9401,
+    %% override the timeout to cause a failure quickly
+    Timeout = application:get_env(ranch_proxy_protocol, proxy_protocol_timeout),
+    application:set_env(ranch_proxy_protocol, proxy_protocol_timeout, 250),
+    {ok, Listen} = ranch_proxy:listen([{port, Port}]),
+    [{port, Port},
+     {listen, Listen},
+     {timeout, Timeout} | Config].
 
+end_per_testcase(fail_timeout_clean, Config) ->
+    %% reset the timeout value
+    case ?config(timeout, Config) of
+        undefined ->
+            application:unset_env(ranch_proxy_protocol, proxy_protocol_timeout);
+        {ok, Val} ->
+            application:set_env(ranch_proxy_protocol, proxy_protocol_timeout, Val)
+    end,
+    Config;
 end_per_testcase(_, Config) ->
     ranch:stop_listener(ranch_proxy_protocol_acceptor),
     Config.
@@ -94,3 +127,53 @@ reuse_socket(Config) ->
     end,
     ranch_proxy:close(Socket1),
     Config.
+
+fail_not_proxy_clean(Config) ->
+    Port = ?config(port, Config),
+    Acceptor = ?config(acceptor, Config),
+    {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
+    gen_tcp:send(Conn, <<"PROXY GARBAGE\r\n">>),
+    receive
+        {Acceptor, {error, not_proxy_protocol}} ->
+            [] = ports(Acceptor)
+    after 5000 ->
+        error(timeout)
+    end.
+
+fail_garbage_clean(Config) ->
+    Port = ?config(port, Config),
+    Acceptor = ?config(acceptor, Config),
+    {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
+    gen_tcp:send(Conn, <<"garbage data\r\n">>),
+    receive
+        {Acceptor, {error, {tcp, _, _}}} ->
+            [] = ports(Acceptor)
+    after 5000 ->
+        error(timeout)
+    end.
+
+fail_timeout_clean(Config) ->
+    Port = ?config(port, Config),
+    Listen = ?config(listen, Config),
+    Acceptor = start_acceptor(Listen),
+    {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
+    gen_tcp:send(Conn, <<"garbage data">>), % no CLRF may wait forever
+    receive
+        {Acceptor, {error, {timeout, proxy_handshake}}} ->
+            [] = ports(Acceptor)
+    after 5000 ->
+        error(timeout)
+    end.
+
+
+%%% Helpers %%%
+start_acceptor(Listen) ->
+    Parent = self(),
+    spawn_link(fun() ->
+        Parent ! {self(), ranch_proxy:accept(Listen, infinity)},
+        timer:sleep(infinity)
+    end).
+
+ports(Proc) ->
+    {links, Links} = process_info(Proc, links),
+    [P || P <- Links, is_port(P)].
