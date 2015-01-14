@@ -15,6 +15,7 @@
 -export([match_port/1]).
 -export([listen/1]).
 -export([accept/2]).
+-export([accept_ack/2]).
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
@@ -102,6 +103,10 @@ accept(#proxy_socket{lsocket = LSocket,
         {error, Error} ->
             {error, Error}
     end.
+
+-spec accept_ack(inet:socket(), timeout()) -> ok.
+accept_ack(_, _) ->
+    ok.
 
 -spec connect(inet:ip_address() | inet:hostname(),
               inet:port_number(), any())
