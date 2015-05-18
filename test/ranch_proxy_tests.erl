@@ -1,11 +1,11 @@
--module(ranch_proxy_protocol_tests).
+-module(ranch_proxy_tests).
 
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
 -define(TEST_TIMEOUT, 1000).
 
-ranch_proxy_protocol_test_() ->
+ranch_proxy_test_() ->
     {foreach, fun setup/0, fun teardown/1,
      [{with, [T]} || T <- [fun ?MODULE:messages_test_/1,
                            fun ?MODULE:secure_test_/1,
@@ -27,8 +27,7 @@ setup() ->
 
 teardown(_) ->
     application:stop(ranch),
-    application:unload(ranch_proxy_protocol),
-    catch ranch:stop_listener(ranch_proxy_protocol_acceptor).
+    application:unload(ranch_proxy_protocol).
 
 %% TESTS
 messages_test_(_State) ->
