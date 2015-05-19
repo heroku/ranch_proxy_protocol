@@ -220,11 +220,18 @@ filter_ssl_opts([{Key, _}=SslOpt|Rest], SslOpts, SocketOpts) when
       Key == ssl_imp;
       Key == reuse_sessions;
       Key == reuse_session;
-      Key == next_protocol_advertised;
+      Key == next_protocols_advertised;
       Key == client_preferred_next_protocols;
       Key == client;
       Key == log_alert;
-      Key == server_name_indication ->
+      Key == server_name_indication;
+      Key == alpn_preferred_protocols;
+      Key == alpn_advertised_protocols;
+      Key == client_preferred_next_protocols;
+      Key == sni_fun;
+      Key == sni_hosts;
+      Key == fallback;
+      Key == honor_cipher_order ->
     filter_ssl_opts(Rest, [SslOpt|SslOpts], SocketOpts);
 filter_ssl_opts([SocketOpt|Rest], SslOpts, SocketOpts) ->
     filter_ssl_opts(Rest, SslOpts, [SocketOpt|SocketOpts]).
