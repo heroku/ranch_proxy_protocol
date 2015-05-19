@@ -11,10 +11,12 @@
                         dest_port :: inet:port_number()}).
 
 -export([name/0]).
+-export([secure/0]).
 -export([messages/0]).
 -export([match_port/1]).
 -export([listen/1]).
 -export([accept/2]).
+-export([accept_ack/2]).
 -export([connect/3]).
 -export([connect/4]).
 -export([recv/3]).
@@ -27,6 +29,7 @@
 -export([peername/1]).
 -export([proxyname/1]).
 -export([sockname/1]).
+-export([shutdown/2]).
 -export([close/1]).
 
 -export([opts_from_socket/2]).
@@ -36,6 +39,7 @@
                        {source_port, inet:port_number()} |
                        {dest_address, inet:ip_address()} |
                        {source_port, inet:port_number()}].
+
 -opaque proxy_socket() :: #proxy_socket{}.
 -type proxy_protocol_info() :: {{inet:ip_address(), inet:port_number()},
                                 {inet:ip_address(), inet:port_number()}}.
@@ -46,6 +50,9 @@
 -define(DEFAULT_PROXY_TIMEOUT, config(proxy_protocol_timeout)).
 
 name() -> proxy_protocol_tcp.
+
+-spec secure() -> false.
+secure() -> false.
 
 messages() -> ranch_tcp:messages().
 
@@ -68,7 +75,7 @@ listen(Opts) ->
 accept(#proxy_socket{lsocket = LSocket,
                      opts = Opts}, Timeout) ->
     Started = os:timestamp(),
-    case ranch_tcp:accept(LSocket, Timeout) of 
+    case ranch_tcp:accept(LSocket, Timeout) of
         {ok, CSocket} ->
             NextWait = get_next_timeout(Started, os:timestamp(), Timeout),
             ProxySocket = #proxy_socket{ lsocket = LSocket,
@@ -103,15 +110,19 @@ accept(#proxy_socket{lsocket = LSocket,
             {error, Error}
     end.
 
+-spec accept_ack(proxy_socket(), timeout()) -> ok.
+accept_ack(_ProxySocket, _Timeout) ->
+    ok.
+
 -spec connect(inet:ip_address() | inet:hostname(),
               inet:port_number(), any())
-	-> {ok, proxy_socket()} | {error, atom()}.
+             -> {ok, proxy_socket()} | {error, atom()}.
 connect(Host, Port, Opts) when is_integer(Port) ->
     connect(Host, Port, Opts, []).
 
 -spec connect(inet:ip_address() | inet:hostname(),
               inet:port_number(), any(), proxy_opts())
-	-> {ok, proxy_socket()} | {error, atom()}.
+             -> {ok, proxy_socket()} | {error, atom()}.
 connect(Host, Port, Opts, ProxyOpts) when is_integer(Port) ->
     case ranch_tcp:connect(Host, Port, Opts) of
         {ok, Socket} ->
@@ -187,6 +198,11 @@ proxyname(#proxy_socket{source_address = SourceAddress,
               -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 sockname(#proxy_socket{lsocket = Socket}) ->
     ranch_tcp:sockname(Socket).
+
+-spec shutdown(proxy_socket(), read|write|read_write)
+              -> ok | {error, atom()}.
+shutdown(#proxy_socket{csocket=Socket}, How) ->
+    ranch_tcp:shutdown(Socket, How).
 
 -spec close(proxy_socket()) -> ok.
 close(#proxy_socket{csocket=Socket}) ->
