@@ -70,7 +70,8 @@ end_per_testcase(fail_timeout_clean, Config) ->
         undefined ->
             application:unset_env(ranch_proxy_protocol, proxy_protocol_timeout);
         {ok, Val} ->
-            application:set_env(ranch_proxy_protocol, proxy_protocol_timeout, Val)
+            application:set_env(ranch_proxy_protocol, proxy_protocol_timeout,
+                                Val)
     end,
     Config;
 end_per_testcase(_, Config) ->
@@ -164,7 +165,6 @@ fail_timeout_clean(Config) ->
     after 5000 ->
         error(timeout)
     end.
-
 
 %%% Helpers %%%
 start_acceptor(Listen) ->
