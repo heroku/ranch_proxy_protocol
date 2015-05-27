@@ -28,7 +28,8 @@
          close/1,
          opts_from_socket/2,
          bearer_port/1,
-         listen_port/1
+         listen_port/1,
+         match_port/1
         ]).
 
 -type proxy_opts() :: ranch_proxy_protocol:proxy_opts().
@@ -180,6 +181,9 @@ bearer_port(#ssl_socket{proxy_socket=ProxySocket}) ->
 -spec listen_port(ssl_socket()) -> port().
 listen_port(#ssl_socket{proxy_socket=ProxySocket}) ->
     ranch_proxy_protocol:listen_port(?TRANSPORT, ProxySocket).
+
+match_port(#ssl_socket{proxy_socket=ProxySocket}) ->
+    ranch_proxy_protocol:match_port(?TRANSPORT, ProxySocket).
 
 -spec opts_from_socket(atom(), ssl_socket()) ->
                               ranch_proxy_protocol:proxy_opts().
