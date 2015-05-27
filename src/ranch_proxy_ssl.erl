@@ -158,6 +158,9 @@ proxyname(#ssl_socket{proxy_socket = ProxySocket}) ->
 
 -spec sockname(ssl_socket())
               -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
+sockname(#ssl_socket{proxy_socket = ProxySocket,
+                                upgraded = false}) ->
+    ranch_proxy:sockname(ProxySocket);
 sockname(#ssl_socket{proxy_socket = ProxySocket}) ->
     ranch_proxy_protocol:sockname(?TRANSPORT, ProxySocket).
 
