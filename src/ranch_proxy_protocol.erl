@@ -216,7 +216,7 @@ listen_port(_, #proxy_socket{lsocket = Port}) ->
     Port.
 
 -spec match_port(transport(), proxy_socket()) -> port().
-match_port(_, #proxy_socket{csocket = Port}) -> Port.
+match_port(Transport, Socket) -> bearer_port(Transport, Socket).
 
 %% Internal
 create_proxy_protocol_header(SourceAddress, DestAddress, SourcePort, DestPort)
