@@ -83,7 +83,7 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
             ok = setopts(Transport, ProxySocket, [{active, once}, {packet, line}]),
             receive
                 {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
-                    case parse_proxy_protocol(ProxyInfo) of
+                    case parse_proxy_protocol_v1(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
                             reset_socket_opts(Transport, ProxySocket, Opts),
                             {ok, ProxySocket#proxy_socket{inet_version = InetVersion,
@@ -248,7 +248,7 @@ get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
                                               tuple_size(DestAddress) =:= 4 ->
     ipv4.
 
-parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
+parse_proxy_protocol_v1(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
     InfoStr = binary_to_list(Info),
     case string:tokens(InfoStr, " \r\n") of
         [SourceAddress, DestAddress, SourcePort, DestPort] ->
@@ -260,9 +260,9 @@ parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
                     malformed_proxy_protocol
             end
     end;
-parse_proxy_protocol(<<"UNKNOWN", _/binary>>) ->
+parse_proxy_protocol_v1(<<"UNKNOWN", _/binary>>) ->
     unknown_peer;
-parse_proxy_protocol(_) ->
+parse_proxy_protocol_v1(_) ->
     not_proxy_protocol.
 
 parse_inet(<<"4">>) ->
