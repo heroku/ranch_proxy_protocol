@@ -101,6 +101,12 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                             close(Transport, ProxySocket),
                             {error, not_proxy_protocol}
                     end;
+                {_, CSocket, <<"\r\n\r\n\0\r\nQUIT\n", ProxyInfo/binary>>} ->
+                    case parse_proxy_protocol_v2(ProxyInfo) of
+                        not_proxy_protocol ->
+                            close(Transport, ProxySocket),
+                            {error, not_proxy_protocol}
+                    end;
                 Other ->
                     close(Transport, ProxySocket),
                     {error, Other}
@@ -266,6 +272,13 @@ parse_proxy_protocol_v1(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
 parse_proxy_protocol_v1(<<"UNKNOWN", _/binary>>) ->
     unknown_peer;
 parse_proxy_protocol_v1(_) ->
+    not_proxy_protocol.
+
+parse_proxy_protocol_v2(<<2:4, 0:4, Rest/binary>>) ->
+    {local, Rest};
+parse_proxy_protocol_v2(<<2:4, 1:4, Rest/binary>>) ->
+    {proxy, Rest};
+parse_proxy_protocol_v2(_) ->
     not_proxy_protocol.
 
 parse_inet(<<"4">>) ->
