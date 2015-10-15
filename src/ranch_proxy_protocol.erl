@@ -35,7 +35,9 @@
                         source_address :: inet:ip_address(),
                         dest_address :: inet:ip_address(),
                         source_port :: inet:port_number(),
-                        dest_port :: inet:port_number()}).
+                        dest_port :: inet:port_number(),
+                        protocol,
+                        sni_hostname}).
 -type transport() :: module().
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
@@ -141,7 +143,7 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                                   SourcePort:16, DestPort:16, Rest/binary>> ->
                                     SourceAddress = {SA1, SA2, SA3, SA4},
                                     DestAddress = {DA1, DA2, DA3, DA4},
-                                    parse_tlv(Rest),
+                                    ct:pal("~p", [parse_tlv(Rest)]),
                                     {ok, ProxySocket#proxy_socket{inet_version = ipv4,
                                                                   source_address = SourceAddress,
                                                                   dest_address = DestAddress,
@@ -339,27 +341,37 @@ parse_tlv(Rest) ->
 parse_tlv(<<>>, Result) ->
     Result;
 parse_tlv(<<Type:8, Len:16, Value:Len/binary, Rest/binary>>, Result) ->
-    parse_tlv(Rest, [{pp2_type(Type), pp2_value(Type, Value)} | Result]);
+    case pp2_type(Type) of
+        ssl ->
+            parse_tlv(Rest, pp2_value(Type, Value) ++ Result);
+        TypeName ->
+            parse_tlv(Rest, [{TypeName, Value} | Result])
+    end;
 parse_tlv(_, _) ->
     {error, parse_tlv}.
 
 pp2_type(?PP2_TYPE_ALPN) ->
-    alpn;
+    negotiated_protocol;
 pp2_type(?PP2_TYPE_AUTHORITY) ->
     authority;
 pp2_type(?PP2_TYPE_SSL) ->
     ssl;
 pp2_type(?PP2_TYPE_SSL_VERSION) ->
-    ssl_version;
+    protocol;
 pp2_type(?PP2_TYPE_SSL_CN) ->
-    ssl_cn;
+    sni_hostname;
 pp2_type(?PP2_TYPE_NETNS) ->
     netns;
 pp2_type(_) ->
     invalid_pp2_type.
 
 pp2_value(?PP2_TYPE_SSL, <<Client:8, _:32, Rest/binary>>) ->
-    {pp2_client(Client), parse_tlv(Rest)};
+    case pp2_client(Client) of
+        invalid_client ->
+            invalid;
+        _ ->
+            parse_tlv(Rest)
+    end;
 pp2_value(_, Value) ->
     Value.
 
