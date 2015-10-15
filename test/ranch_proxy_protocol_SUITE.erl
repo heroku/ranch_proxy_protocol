@@ -4,7 +4,7 @@
 -compile(export_all).
 
 all() ->
-    [ new_connection, proxy_connect,
+    [ new_connection, new_connection_v2, proxy_connect,
       reuse_socket, fail_not_proxy_clean,
       fail_garbage_clean, fail_timeout_clean ].
 
@@ -14,6 +14,15 @@ init_per_suite(Config) ->
     Config.
 
 init_per_testcase(new_connection, Config) ->
+    Port = 9401,
+    {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
+                                     1,
+                                     ranch_proxy,
+                                     [{port, Port}],
+                                     ranch_proxy_protocol_test_protocol, [{tester, self()}]),
+    [{port, Port},
+     {listeners, Pid} | Config];
+init_per_testcase(new_connection_v2, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
@@ -84,6 +93,18 @@ new_connection(Config) ->
     {ok, Socket} = gen_tcp:connect({127,0,0,1}, Port,
                                    [binary, {active, false}, {packet, raw}]),
     ok = gen_tcp:send(Socket, "PROXY TCP4 192.168.1.1 192.168.1.2 80 81\r\n"),
+    receive
+        X ->
+            {{{192,168,1,1}, 80}, {{192,168,1,2}, 81}} = X
+    end,
+    Config.
+
+new_connection_v2(Config) ->
+    Port = ?config(port, Config),
+    {ok, Socket} = gen_tcp:connect({127,0,0,1}, Port,
+                                   [binary, {active, false}, {packet, raw}]),
+    ok = gen_tcp:send(Socket, <<"\r\n\r\n\0\r\nQUIT\n", 2:4, 1:4, 1:4, 1:4, 12:16>>),
+    ok = gen_tcp:send(Socket, <<192:8, 168:8, 1:8, 1:8, 192:8, 168:8, 1:8, 2:8, 80:16, 81:16>>),
     receive
         X ->
             {{{192,168,1,1}, 80}, {{192,168,1,2}, 81}} = X

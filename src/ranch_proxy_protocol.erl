@@ -101,11 +101,30 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                             close(Transport, ProxySocket),
                             {error, not_proxy_protocol}
                     end;
-                {_, CSocket, <<"\r\n\r\n\0\r\nQUIT\n", ProxyInfo/binary>>} ->
-                    case parse_proxy_protocol_v2(ProxyInfo) of
-                        not_proxy_protocol ->
+                {_, CSocket, <<"\r\n">>} ->
+                    ok = setopts(Transport, ProxySocket, [{packet, raw}]),
+                    {ok, ProxyHeader} = Transport:recv(CSocket, 14, 1000),
+                    case parse_proxy_protocol_v2(ProxyHeader) of
+                        {proxy, ipv4, _Protocol, Length} ->
+                            {ok, ProxyAddr} = Transport:recv(CSocket, Length, 1000),
+                            case ProxyAddr of
+                                <<SA1:8, SA2:8, SA3:8, SA4:8,
+                                  DA1:8, DA2:8, DA3:8, DA4:8,
+                                  SourcePort:16, DestPort:16>> ->
+                                    SourceAddress = {SA1, SA2, SA3, SA4},
+                                    DestAddress = {DA1, DA2, DA3, DA4},
+                                    {ok, ProxySocket#proxy_socket{inet_version = ipv4,
+                                                                  source_address = SourceAddress,
+                                                                  dest_address = DestAddress,
+                                                                  source_port = SourcePort,
+                                                                  dest_port = DestPort}};
+                                _ ->
+                                    close(Transport, ProxySocket),
+                                    {error, not_proxy_protocol}
+                            end;
+                        _Unsupported ->
                             close(Transport, ProxySocket),
-                            {error, not_proxy_protocol}
+                            {error, not_supported_v2}
                     end;
                 Other ->
                     close(Transport, ProxySocket),
@@ -274,12 +293,36 @@ parse_proxy_protocol_v1(<<"UNKNOWN", _/binary>>) ->
 parse_proxy_protocol_v1(_) ->
     not_proxy_protocol.
 
-parse_proxy_protocol_v2(<<2:4, 0:4, Rest/binary>>) ->
-    {local, Rest};
-parse_proxy_protocol_v2(<<2:4, 1:4, Rest/binary>>) ->
-    {proxy, Rest};
+%% first 4 bits are the version of the protocole, must be 2
+%% nex 4 bits represent whether it is local or a proxy connection
+%% 4 bits for family and 4 bits for protocol
+%% 1 byte for length of address information
+parse_proxy_protocol_v2(<<"\r\n\0\r\nQUIT\n", 2:4, 0:4, X:4, Y:4, Len:16>>) ->
+    {local, family(X), protocol(Y), Len};
+parse_proxy_protocol_v2(<<"\r\n\0\r\nQUIT\n", 2:4, 1:4, X:4, Y:4, Len:16>>) ->
+    {proxy, family(X), protocol(Y), Len};
 parse_proxy_protocol_v2(_) ->
     not_proxy_protocol.
+
+family(0) ->
+    af_unspec;
+family(1) ->
+    ipv4; %% af_inet;
+family(2) ->
+    ipv6; %% af_inet6;
+family(3) ->
+    af_unix;
+family(_) ->
+    {error, invalid_address_family}.
+
+protocol(0) ->
+    unspec;
+protocol(1) ->
+    stream;
+protocol(2) ->
+    dgram;
+protocol(_) ->
+    {error, invalid_protocol}.
 
 parse_inet(<<"4">>) ->
     ipv4;
