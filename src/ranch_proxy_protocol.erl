@@ -51,6 +51,34 @@
 
 -define(DEFAULT_PROXY_TIMEOUT, config(proxy_protocol_timeout)).
 
+%% \r\n\r\n\0\r\nQUIT\n
+-define(HEADER, "\r\n\r\n\0\r\nQUIT\n").
+-define(VSN, 16#02).
+
+%% Protocol types
+-define(AF_UNSPEC, 16#00).
+-define(AF_INET, 16#01).
+-define(AF_INET6, 16#02).
+-define(AF_UNIX, 16#03).
+
+%% Transfer types
+-define(UNSPEC, 16#00).
+-define(STREAM, 16#01).
+-define(DGRAM, 16#02).
+
+%% TLV types for additional headers
+-define(PP2_TYPE_ALPN, 16#01).
+-define(PP2_TYPE_AUTHORITY, 16#02).
+-define(PP2_TYPE_SSL, 16#20).
+-define(PP2_TYPE_SSL_VERSION, 16#21).
+-define(PP2_TYPE_SSL_CN, 16#22).
+-define(PP2_TYPE_NETNS, 16#30).
+
+%% SSL Client fields
+-define(PP2_CLIENT_SSL, 16#01).
+-define(PP2_CLIENT_CERT_CONN, 16#02).
+-define(PP2_CLIENT_CERT_SESS, 16#04).
+
 %% Record manipulation API
 -spec get_csocket(proxy_socket()) -> port().
 get_csocket(#proxy_socket{csocket = CSocket}) ->
@@ -104,15 +132,16 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                 {_, CSocket, <<"\r\n">>} ->
                     ok = setopts(Transport, ProxySocket, [{packet, raw}]),
                     {ok, ProxyHeader} = Transport:recv(CSocket, 14, 1000),
-                    case parse_proxy_protocol_v2(ProxyHeader) of
+                    case parse_proxy_protocol_v2(<<"\r\n", ProxyHeader/binary>>) of
                         {proxy, ipv4, _Protocol, Length} ->
                             {ok, ProxyAddr} = Transport:recv(CSocket, Length, 1000),
                             case ProxyAddr of
                                 <<SA1:8, SA2:8, SA3:8, SA4:8,
                                   DA1:8, DA2:8, DA3:8, DA4:8,
-                                  SourcePort:16, DestPort:16>> ->
+                                  SourcePort:16, DestPort:16, Rest/binary>> ->
                                     SourceAddress = {SA1, SA2, SA3, SA4},
                                     DestAddress = {DA1, DA2, DA3, DA4},
+                                    parse_tlv(Rest),
                                     {ok, ProxySocket#proxy_socket{inet_version = ipv4,
                                                                   source_address = SourceAddress,
                                                                   dest_address = DestAddress,
@@ -297,29 +326,69 @@ parse_proxy_protocol_v1(_) ->
 %% nex 4 bits represent whether it is local or a proxy connection
 %% 4 bits for family and 4 bits for protocol
 %% 1 byte for length of address information
-parse_proxy_protocol_v2(<<"\r\n\0\r\nQUIT\n", 2:4, 0:4, X:4, Y:4, Len:16>>) ->
+parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 0:4, X:4, Y:4, Len:16>>) ->
     {local, family(X), protocol(Y), Len};
-parse_proxy_protocol_v2(<<"\r\n\0\r\nQUIT\n", 2:4, 1:4, X:4, Y:4, Len:16>>) ->
+parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 1:4, X:4, Y:4, Len:16>>) ->
     {proxy, family(X), protocol(Y), Len};
 parse_proxy_protocol_v2(_) ->
     not_proxy_protocol.
 
-family(0) ->
+parse_tlv(Rest) ->
+    parse_tlv(Rest, []).
+
+parse_tlv(<<>>, Result) ->
+    ct:pal("~p", [Result]),
+    Result;
+parse_tlv(<<Type:8, Len:16, Value:Len, Rest/binary>>, Result) ->
+    parse_tlv(Rest, [{pp2_type(Type), pp2_value(Type, Value)} | Result]);
+parse_tlv(_, _) ->
+    {error, parse_tlv}.
+
+pp2_type(?PP2_TYPE_ALPN) ->
+    alpn;
+pp2_type(?PP2_TYPE_AUTHORITY) ->
+    authority;
+pp2_type(?PP2_TYPE_SSL) ->
+    ssl;
+pp2_type(?PP2_TYPE_SSL_VERSION) ->
+    ssl_version;
+pp2_type(?PP2_TYPE_SSL_CN) ->
+    ssl_cn;
+pp2_type(?PP2_TYPE_NETNS) ->
+    netns;
+pp2_type(_) ->
+    invalid_pp2_type.
+
+pp2_value(?PP2_TYPE_SSL, <<Client:8, Rest/binary>>) ->
+    {pp2_client(Client), parse_tlv(Rest)};
+pp2_value(_, Value) ->
+    Value.
+
+pp2_client(?PP2_CLIENT_SSL) ->
+    client_ssl;
+pp2_client(?PP2_CLIENT_CERT_CONN) ->
+    client_cert_conn;
+pp2_client(?PP2_CLIENT_CERT_SESS) ->
+    client_cert_sess;
+pp2_client(_) ->
+    invalid_client.
+
+family(?AF_UNSPEC) ->
     af_unspec;
-family(1) ->
-    ipv4; %% af_inet;
-family(2) ->
-    ipv6; %% af_inet6;
-family(3) ->
+family(?AF_INET) ->
+    ipv4;
+family(?AF_INET6) ->
+    ipv6;
+family(?AF_UNIX) ->
     af_unix;
 family(_) ->
     {error, invalid_address_family}.
 
-protocol(0) ->
+protocol(?UNSPEC) ->
     unspec;
-protocol(1) ->
+protocol(?STREAM) ->
     stream;
-protocol(2) ->
+protocol(?DGRAM) ->
     dgram;
 protocol(_) ->
     {error, invalid_protocol}.
