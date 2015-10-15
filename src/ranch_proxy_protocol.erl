@@ -337,9 +337,8 @@ parse_tlv(Rest) ->
     parse_tlv(Rest, []).
 
 parse_tlv(<<>>, Result) ->
-    ct:pal("~p", [Result]),
     Result;
-parse_tlv(<<Type:8, Len:16, Value:Len, Rest/binary>>, Result) ->
+parse_tlv(<<Type:8, Len:16, Value:Len/binary, Rest/binary>>, Result) ->
     parse_tlv(Rest, [{pp2_type(Type), pp2_value(Type, Value)} | Result]);
 parse_tlv(_, _) ->
     {error, parse_tlv}.
@@ -359,7 +358,7 @@ pp2_type(?PP2_TYPE_NETNS) ->
 pp2_type(_) ->
     invalid_pp2_type.
 
-pp2_value(?PP2_TYPE_SSL, <<Client:8, Rest/binary>>) ->
+pp2_value(?PP2_TYPE_SSL, <<Client:8, _:32, Rest/binary>>) ->
     {pp2_client(Client), parse_tlv(Rest)};
 pp2_value(_, Value) ->
     Value.
