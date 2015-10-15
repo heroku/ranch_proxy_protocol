@@ -365,22 +365,22 @@ pp2_type(?PP2_TYPE_NETNS) ->
 pp2_type(_) ->
     invalid_pp2_type.
 
-pp2_value(?PP2_TYPE_SSL, <<Client:8, _:32, Rest/binary>>) ->
+pp2_value(?PP2_TYPE_SSL, <<Client:1/binary, _:32, Rest/binary>>) ->
     case pp2_client(Client) of
         invalid_client ->
             invalid;
         _ ->
+            %% Can validate we get all necessary values based on the Client bit field here
             parse_tlv(Rest)
     end;
 pp2_value(_, Value) ->
     Value.
 
-pp2_client(?PP2_CLIENT_SSL) ->
+pp2_client(<<0:5,             % UNASSIGNED
+             _ClientCert:1,   % PP2_CLIENT_CERT_SESS
+             _ClientCert:1,   % PP2_CLIENT_CERT_CONN
+             _ClientSSL:1>>) ->
     client_ssl;
-pp2_client(?PP2_CLIENT_CERT_CONN) ->
-    client_cert_conn;
-pp2_client(?PP2_CLIENT_CERT_SESS) ->
-    client_cert_sess;
 pp2_client(_) ->
     invalid_client.
 
