@@ -36,8 +36,7 @@
                         dest_address :: inet:ip_address(),
                         source_port :: inet:port_number(),
                         dest_port :: inet:port_number(),
-                        protocol,
-                        sni_hostname}).
+                        connection_info}).
 -type transport() :: module().
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
@@ -143,12 +142,13 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                                   SourcePort:16, DestPort:16, Rest/binary>> ->
                                     SourceAddress = {SA1, SA2, SA3, SA4},
                                     DestAddress = {DA1, DA2, DA3, DA4},
-                                    ct:pal("~p", [parse_tlv(Rest)]),
+                                    ConnectionInfo = parse_tlv(Rest),
                                     {ok, ProxySocket#proxy_socket{inet_version = ipv4,
                                                                   source_address = SourceAddress,
                                                                   dest_address = DestAddress,
                                                                   source_port = SourcePort,
-                                                                  dest_port = DestPort}};
+                                                                  dest_port = DestPort,
+                                                                  connection_info=ConnectionInfo}};
                                 _ ->
                                     close(Transport, ProxySocket),
                                     {error, not_proxy_protocol}
