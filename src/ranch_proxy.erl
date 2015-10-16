@@ -24,7 +24,9 @@
          opts_from_socket/2,
          bearer_port/1,
          listen_port/1,
-         match_port/1
+         match_port/1,
+         connection_info/1,
+         connection_info/2
         ]).
 
 -type proxy_opts() :: ranch_proxy_protocol:proxy_opts().
@@ -117,6 +119,14 @@ peername(ProxySocket) ->
 proxyname(ProxySocket) ->
     ranch_proxy_protocol:proxyname(?TRANSPORT, ProxySocket).
 
+-spec connection_info(proxy_socket()) -> {ok, list()}.
+connection_info(ProxySocket) ->
+    ranch_proxy_protocol:connection_info(ProxySocket).
+
+-spec connection_info(proxy_socket(), [protocol | cipher_suite | sni_hostname]) -> {ok, list()}.
+connection_info(ProxySocket, Items) ->
+    ranch_proxy_protocol:connection_info(ProxySocket, Items).
+
 -spec sockname(proxy_socket())
               -> {ok, {inet:ip_address(), inet:port_number()}} | {error, atom()}.
 sockname(ProxySocket) ->
@@ -143,4 +153,3 @@ listen_port(ProxySocket) ->
                               ranch_proxy_protocol:proxy_opts().
 opts_from_socket(Transport, Socket) ->
     ranch_proxy_protocol:opts_from_socket(Transport, Socket).
-

@@ -20,7 +20,9 @@
          opts_from_socket/2,
          bearer_port/2,
          listen_port/2,
-         match_port/2
+         match_port/2,
+         connection_info/1,
+         connection_info/2
         ]).
 
 % Record manipulation
@@ -36,7 +38,7 @@
                         dest_address :: inet:ip_address(),
                         source_port :: inet:port_number(),
                         dest_port :: inet:port_number(),
-                        connection_info}).
+                        connection_info = []}).
 -type transport() :: module().
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
@@ -245,6 +247,14 @@ proxyname(_, #proxy_socket{source_address = SourceAddress,
                       {error, atom()}.
 sockname(Transport, #proxy_socket{lsocket = Socket}) ->
     Transport:sockname(Socket).
+
+-spec connection_info(proxy_socket()) -> {ok, list()}.
+connection_info(#proxy_socket{connection_info=ConnectionInfo}) ->
+    {ok, ConnectionInfo}.
+
+-spec connection_info(proxy_socket(), [protocol | cipher_suite | sni_hostname]) -> {ok, list()}.
+connection_info(#proxy_socket{connection_info=ConnectionInfo}, Items) ->
+    {ok, [V || Key <- Items, (V = proplists:lookup(Key, ConnectionInfo)) =/= none]}.
 
 -spec shutdown(transport(), proxy_socket(), read|write|read_write) ->
                       ok | {error, atom()}.
