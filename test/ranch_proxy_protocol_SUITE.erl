@@ -4,8 +4,8 @@
 -compile(export_all).
 
 all() ->
-    [ new_connection, proxy_connect,
-      reuse_socket, fail_not_proxy_clean,
+    [ new_connection, new_connection_encoder, new_connection_v2,
+      proxy_connect, reuse_socket, fail_not_proxy_clean,
       fail_garbage_clean, fail_timeout_clean ].
 
 init_per_suite(Config) ->
@@ -14,6 +14,24 @@ init_per_suite(Config) ->
     Config.
 
 init_per_testcase(new_connection, Config) ->
+    Port = 9401,
+    {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
+                                     1,
+                                     ranch_proxy,
+                                     [{port, Port}],
+                                     ranch_proxy_protocol_test_protocol, [{tester, self()}]),
+    [{port, Port},
+     {listeners, Pid} | Config];
+init_per_testcase(new_connection_encoder, Config) ->
+    Port = 9401,
+    {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
+                                     1,
+                                     ranch_proxy,
+                                     [{port, Port}],
+                                     ranch_proxy_protocol_test_protocol, [{tester, self()}]),
+    [{port, Port},
+     {listeners, Pid} | Config];
+init_per_testcase(new_connection_v2, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
                                      1,
@@ -87,6 +105,32 @@ new_connection(Config) ->
     receive
         X ->
             {{{192,168,1,1}, 80}, {{192,168,1,2}, 81}} = X
+    end,
+    Config.
+
+new_connection_encoder(Config) ->
+    Port = ?config(port, Config),
+    {ok, Socket} = gen_tcp:connect({127,0,0,1}, Port,
+                                   [binary, {active, false}, {packet, raw}]),
+    Bin = ranch_proxy_encoder:v1_encode(proxy, inet, {{192,168,1,1},80}, {{192,168,1,2},81}),
+    ok = gen_tcp:send(Socket, Bin),
+    receive
+        X ->
+            {{{192,168,1,1}, 80}, {{192,168,1,2}, 81}} = X
+    end,
+    Config.
+
+new_connection_v2(Config) ->
+    Port = ?config(port, Config),
+    {ok, Socket} = gen_tcp:connect({127,0,0,1}, Port,
+                                   [binary, {active, false}, {packet, raw}]),
+    Bin = ranch_proxy_encoder:v2_encode(proxy, inet, {{127,50,210,1},64032}, {{210,21,16,142},437},
+                                        [{sni_host, "example.org"}]),
+    ok = gen_tcp:send(Socket, Bin),
+
+    receive
+        X ->
+            {{{127,50,210,1},64032},{{210,21,16,142},437}} = X
     end,
     Config.
 

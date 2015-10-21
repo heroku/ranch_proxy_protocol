@@ -1,3 +1,6 @@
+%%% @copyright (C) 2015, Heroku
+%%% @doc Ranch protocol handling for the HA Proxy PROXY protocol [http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt]
+%%% @end
 -module(ranch_proxy_protocol).
 
 -export([accept/3,
@@ -17,7 +20,9 @@
          opts_from_socket/2,
          bearer_port/2,
          listen_port/2,
-         match_port/2
+         match_port/2,
+         connection_info/1,
+         connection_info/2
         ]).
 
 % Record manipulation
@@ -32,7 +37,8 @@
                         source_address :: inet:ip_address(),
                         dest_address :: inet:ip_address(),
                         source_port :: inet:port_number(),
-                        dest_port :: inet:port_number()}).
+                        dest_port :: inet:port_number(),
+                        connection_info = []}).
 -type transport() :: module().
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
                        {source_port, inet:port_number()} |
@@ -47,6 +53,8 @@
               proxy_protocol_info/0]).
 
 -define(DEFAULT_PROXY_TIMEOUT, config(proxy_protocol_timeout)).
+
+-include("ranch_proxy.hrl").
 
 %% Record manipulation API
 -spec get_csocket(proxy_socket()) -> port().
@@ -83,7 +91,7 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
             ok = setopts(Transport, ProxySocket, [{active, once}, {packet, line}]),
             receive
                 {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
-                    case parse_proxy_protocol(ProxyInfo) of
+                    case parse_proxy_protocol_v1(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
                             reset_socket_opts(Transport, ProxySocket, Opts),
                             {ok, ProxySocket#proxy_socket{inet_version = InetVersion,
@@ -97,6 +105,33 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                         not_proxy_protocol ->
                             close(Transport, ProxySocket),
                             {error, not_proxy_protocol}
+                    end;
+                {_, CSocket, <<"\r\n">>} ->
+                    ok = setopts(Transport, ProxySocket, [{packet, raw}]),
+                    {ok, ProxyHeader} = Transport:recv(CSocket, 14, 1000),
+                    case parse_proxy_protocol_v2(<<"\r\n", ProxyHeader/binary>>) of
+                        {proxy, ipv4, _Protocol, Length} ->
+                            {ok, ProxyAddr} = Transport:recv(CSocket, Length, 1000),
+                            case ProxyAddr of
+                                <<SA1:8, SA2:8, SA3:8, SA4:8,
+                                  DA1:8, DA2:8, DA3:8, DA4:8,
+                                  SourcePort:16, DestPort:16, Rest/binary>> ->
+                                    SourceAddress = {SA1, SA2, SA3, SA4},
+                                    DestAddress = {DA1, DA2, DA3, DA4},
+                                    ConnectionInfo = parse_tlv(Rest),
+                                    {ok, ProxySocket#proxy_socket{inet_version = ipv4,
+                                                                  source_address = SourceAddress,
+                                                                  dest_address = DestAddress,
+                                                                  source_port = SourcePort,
+                                                                  dest_port = DestPort,
+                                                                  connection_info=ConnectionInfo}};
+                                _ ->
+                                    close(Transport, ProxySocket),
+                                    {error, not_proxy_protocol}
+                            end;
+                        _Unsupported ->
+                            close(Transport, ProxySocket),
+                            {error, not_supported_v2}
                     end;
                 Other ->
                     close(Transport, ProxySocket),
@@ -187,6 +222,14 @@ proxyname(_, #proxy_socket{source_address = SourceAddress,
 sockname(Transport, #proxy_socket{lsocket = Socket}) ->
     Transport:sockname(Socket).
 
+-spec connection_info(proxy_socket()) -> {ok, list()}.
+connection_info(#proxy_socket{connection_info=ConnectionInfo}) ->
+    {ok, ConnectionInfo}.
+
+-spec connection_info(proxy_socket(), [protocol | cipher_suite | sni_hostname]) -> {ok, list()}.
+connection_info(#proxy_socket{connection_info=ConnectionInfo}, Items) ->
+    {ok, [V || Key <- Items, (V = proplists:lookup(Key, ConnectionInfo)) =/= none]}.
+
 -spec shutdown(transport(), proxy_socket(), read|write|read_write) ->
                       ok | {error, atom()}.
 shutdown(Transport, #proxy_socket{csocket=Socket}, How) ->
@@ -248,7 +291,7 @@ get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
                                               tuple_size(DestAddress) =:= 4 ->
     ipv4.
 
-parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
+parse_proxy_protocol_v1(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
     InfoStr = binary_to_list(Info),
     case string:tokens(InfoStr, " \r\n") of
         [SourceAddress, DestAddress, SourcePort, DestPort] ->
@@ -260,10 +303,98 @@ parse_proxy_protocol(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
                     malformed_proxy_protocol
             end
     end;
-parse_proxy_protocol(<<"UNKNOWN", _/binary>>) ->
+parse_proxy_protocol_v1(<<"UNKNOWN", _/binary>>) ->
     unknown_peer;
-parse_proxy_protocol(_) ->
+parse_proxy_protocol_v1(_) ->
     not_proxy_protocol.
+
+%% first 4 bits are the version of the protocole, must be '2'
+%% next 4 bits represent whether it is a local or a proxy connection;
+%% 4 next bit sare for the family (inet,inet6,or unix)
+%% and 4 bits for protocol (stream / dgram, where inet+stream = tcp, for example)
+%% and 1 full byte for the length of information regarding addresses and SSL (if any)
+%%
+%% 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 ....
+%% | version   |proxy/local|  inet[6]  |  TCP/UDP  | lenght of information  | info
+%%
+parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 0:4, X:4, Y:4, Len:16>>) ->
+    {local, family(X), protocol(Y), Len};
+parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 1:4, X:4, Y:4, Len:16>>) ->
+    {proxy, family(X), protocol(Y), Len};
+parse_proxy_protocol_v2(_) ->
+    not_proxy_protocol.
+
+parse_tlv(Rest) ->
+    parse_tlv(Rest, []).
+
+parse_tlv(<<>>, Result) ->
+    Result;
+parse_tlv(<<Type:8, Len:16, Value:Len/binary, Rest/binary>>, Result) ->
+    case pp2_type(Type) of
+        ssl ->
+            parse_tlv(Rest, pp2_value(Type, Value) ++ Result);
+        TypeName ->
+            parse_tlv(Rest, [{TypeName, Value} | Result])
+    end;
+parse_tlv(_, _) ->
+    {error, parse_tlv}.
+
+pp2_type(?PP2_TYPE_ALPN) ->
+    negotiated_protocol;
+pp2_type(?PP2_TYPE_AUTHORITY) ->
+    authority;
+pp2_type(?PP2_TYPE_SSL) ->
+    ssl;
+pp2_type(?PP2_SUBTYPE_SSL_VERSION) ->
+    protocol;
+pp2_type(?PP2_SUBTYPE_SSL_CN) ->
+    sni_hostname;
+pp2_type(?PP2_TYPE_NETNS) ->
+    netns;
+pp2_type(_) ->
+    invalid_pp2_type.
+
+pp2_value(?PP2_TYPE_SSL, <<Client:1/binary, _:32, Rest/binary>>) ->
+    case pp2_client(Client) of % validates bitfield format, but ignores data
+        invalid_client ->
+            invalid;
+        _ ->
+            %% Fetches TLV values attached, regardless of if the client
+            %% specified SSL. If this is a problem, then we should fix,
+            %% but in any case the blame appears to be on the sender
+            %% who is giving us broken headers.
+            parse_tlv(Rest)
+    end;
+pp2_value(_, Value) ->
+    Value.
+
+pp2_client(<<0:5,             % UNASSIGNED
+             _ClientCert:1,   % PP2_CLIENT_CERT_SESS
+             _ClientCert:1,   % PP2_CLIENT_CERT_CONN
+             _ClientSSL:1>>) ->
+    client_ssl;
+pp2_client(_) ->
+    invalid_client.
+
+family(?AF_UNSPEC) ->
+    af_unspec;
+family(?AF_INET) ->
+    ipv4;
+family(?AF_INET6) ->
+    ipv6;
+family(?AF_UNIX) ->
+    af_unix;
+family(_) ->
+    {error, invalid_address_family}.
+
+protocol(?UNSPEC) ->
+    unspec;
+protocol(?STREAM) ->
+    stream;
+protocol(?DGRAM) ->
+    dgram;
+protocol(_) ->
+    {error, invalid_protocol}.
 
 parse_inet(<<"4">>) ->
     ipv4;
