@@ -54,33 +54,7 @@
 
 -define(DEFAULT_PROXY_TIMEOUT, config(proxy_protocol_timeout)).
 
-%% \r\n\r\n\0\r\nQUIT\n
--define(HEADER, "\r\n\r\n\0\r\nQUIT\n").
--define(VSN, 16#02).
-
-%% Protocol types
--define(AF_UNSPEC, 16#00).
--define(AF_INET, 16#01).
--define(AF_INET6, 16#02).
--define(AF_UNIX, 16#03).
-
-%% Transfer types
--define(UNSPEC, 16#00).
--define(STREAM, 16#01).
--define(DGRAM, 16#02).
-
-%% TLV types for additional headers
--define(PP2_TYPE_ALPN, 16#01).
--define(PP2_TYPE_AUTHORITY, 16#02).
--define(PP2_TYPE_SSL, 16#20).
--define(PP2_TYPE_SSL_VERSION, 16#21).
--define(PP2_TYPE_SSL_CN, 16#22).
--define(PP2_TYPE_NETNS, 16#30).
-
-%% SSL Client fields
--define(PP2_CLIENT_SSL, 16#01).
--define(PP2_CLIENT_CERT_CONN, 16#02).
--define(PP2_CLIENT_CERT_SESS, 16#04).
+-include("ranch_proxy.hrl").
 
 %% Record manipulation API
 -spec get_csocket(proxy_socket()) -> port().
@@ -334,10 +308,15 @@ parse_proxy_protocol_v1(<<"UNKNOWN", _/binary>>) ->
 parse_proxy_protocol_v1(_) ->
     not_proxy_protocol.
 
-%% first 4 bits are the version of the protocole, must be 2
-%% nex 4 bits represent whether it is local or a proxy connection
-%% 4 bits for family and 4 bits for protocol
-%% 1 byte for length of address information
+%% first 4 bits are the version of the protocole, must be '2'
+%% next 4 bits represent whether it is a local or a proxy connection;
+%% 4 next bit sare for the family (inet,inet6,or unix)
+%% and 4 bits for protocol (stream / dgram, where inet+stream = tcp, for example)
+%% and 1 full byte for the length of information regarding addresses and SSL (if any)
+%%
+%% 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 ....
+%% | version   |proxy/local|  inet[6]  |  TCP/UDP  | lenght of information  | info
+%%
 parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 0:4, X:4, Y:4, Len:16>>) ->
     {local, family(X), protocol(Y), Len};
 parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 1:4, X:4, Y:4, Len:16>>) ->
@@ -366,9 +345,9 @@ pp2_type(?PP2_TYPE_AUTHORITY) ->
     authority;
 pp2_type(?PP2_TYPE_SSL) ->
     ssl;
-pp2_type(?PP2_TYPE_SSL_VERSION) ->
+pp2_type(?PP2_SUBTYPE_SSL_VERSION) ->
     protocol;
-pp2_type(?PP2_TYPE_SSL_CN) ->
+pp2_type(?PP2_SUBTYPE_SSL_CN) ->
     sni_hostname;
 pp2_type(?PP2_TYPE_NETNS) ->
     netns;
@@ -376,11 +355,14 @@ pp2_type(_) ->
     invalid_pp2_type.
 
 pp2_value(?PP2_TYPE_SSL, <<Client:1/binary, _:32, Rest/binary>>) ->
-    case pp2_client(Client) of
+    case pp2_client(Client) of % validates bitfield format, but ignores data
         invalid_client ->
             invalid;
         _ ->
-            %% Can validate we get all necessary values based on the Client bit field here
+            %% Fetches TLV values attached, regardless of if the client
+            %% specified SSL. If this is a problem, then we should fix,
+            %% but in any case the blame appears to be on the sender
+            %% who is giving us broken headers.
             parse_tlv(Rest)
     end;
 pp2_value(_, Value) ->
