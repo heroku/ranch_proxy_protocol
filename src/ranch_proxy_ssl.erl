@@ -64,17 +64,24 @@ listen(Opts) ->
 
 -spec accept(proxy_socket(), timeout())
             -> {ok, ssl_socket()} | {error, closed | timeout | not_proxy_protocol |
+                                     closed_on_ssl_accept |
                                      {timeout, proxy_handshake} | atom()}.
 accept(#ssl_socket{proxy_socket = ProxySocket,
                    sslopts      = Opts} = ProxySslSocket, Timeout) ->
     case ranch_proxy:accept(ProxySocket, Timeout) of
         {ok, ProxySocket1} ->
             CSocket = ranch_proxy_protocol:get_csocket(ProxySocket1),
-            {ok, SslSocket} = ssl:ssl_accept(CSocket, Opts, Timeout),
-            ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
-                                                            SslSocket),
-            {ok, ProxySslSocket#ssl_socket{proxy_socket = ProxySocket2,
-                                           upgraded     = true}};
+            case ssl:ssl_accept(CSocket, Opts, Timeout) of
+                {ok, SslSocket} ->
+                    ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
+                                                                    SslSocket),
+                    {ok, ProxySslSocket#ssl_socket{proxy_socket = ProxySocket2,
+                                                   upgraded     = true}};
+                {error, closed} ->
+                    {error, closed_on_ssl_accept};
+                {error, Error} ->
+                    {error, Error}
+            end;
         {error, Error} ->
             {error, Error}
     end.

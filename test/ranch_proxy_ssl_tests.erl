@@ -15,6 +15,7 @@ ranch_proxy_ssl_test_() ->
               [{with, [T]} || T <- [fun ?MODULE:messages_test_/1,
                                     fun ?MODULE:secure_test_/1,
                                     fun ?MODULE:accept_and_connect_test_/1,
+                                    fun ?MODULE:accept_error_closed_on_ssl_accept_test_/1,
                                     fun ?MODULE:send_and_recv_test_/1,
                                     fun ?MODULE:sendfile_and_recv_test_/1,
                                     fun ?MODULE:sendopts_test_/1
@@ -54,13 +55,19 @@ secure_test_(_State) ->
     ?assertEqual(true, ranch_proxy_ssl:secure()).
 
 % Listen on a socket, accept a connection and read the proxy protocol
-% line. This tests is borht for the accept and connect functions.
+% line. This tests is both for the accept and connect functions.
 accept_and_connect_test_(State) ->
     % Setup a connection and return the sockets
     {AcceptProxySocket, _ConnectedProxySocket} = accept_and_connect(State),
     {ok, ProxyName} = ranch_proxy_ssl:proxyname(AcceptProxySocket),
     ?assertEqual({{{10,10,10,10},8888},
                   {{11,11,11,11},9999}}, ProxyName).
+
+% Listens on a socket, connects to it with non-SSL ranch_proxy:connect,
+% then closes when ssl:ssl_accept would be running to ensure a nice
+% error is returned.
+accept_error_closed_on_ssl_accept_test_(State) ->
+    ?assertEqual({error, closed_on_ssl_accept}, accept_and_close(State)).
 
 send_and_recv_test_(State) ->
     {AcceptProxySocket, ConnectedProxySocket} = accept_and_connect(State),
@@ -88,17 +95,21 @@ sendopts_test_(State) ->
                  ssl:getopts(AcceptPort, [delay_send])).
 
 % Internal
+accept(ListenProxySocket) ->
+    % Spawn the accept loop
+    erlang:spawn(?MODULE, accept_loop, [ListenProxySocket, self()]),
+    [{source_address, {10,10,10,10}},
+     {source_port, 8888},
+     {dest_address, {11,11,11,11}},
+     {dest_port, 9999}].
+
 accept_and_connect(#{listen_socket := ListenProxySocket,
                      address       := Address,
                      port          := Port,
                      cert          := Cert,
                      key           := Key}) ->
-    % Spawn the accept loop
-    erlang:spawn(?MODULE, accept_loop, [ListenProxySocket, self()]),
-    ProxyOptions = [{source_address, {10,10,10,10}},
-                    {source_port, 8888},
-                    {dest_address, {11,11,11,11}},
-                    {dest_port, 9999}],
+    ProxyOptions = accept(ListenProxySocket),
+
     % Connect to the server
     {ok, ConnectedProxySocket} = ranch_proxy_ssl:connect(Address, Port,
                                                          [{cert, Cert},
@@ -108,17 +119,34 @@ accept_and_connect(#{listen_socket := ListenProxySocket,
     {ok, AcceptedProxySocket} = accept_socket(),
     {AcceptedProxySocket, ConnectedProxySocket}.
 
+accept_and_close(#{listen_socket := ListenProxySocket,
+                   address       := Address,
+                   port          := Port,
+                   cert          := _,
+                   key           := _}) ->
+    ProxyOptions = accept(ListenProxySocket),
+
+    {ok, ConnectedProxySocket} = ranch_proxy:connect(Address, Port, [], ProxyOptions),
+    ok = ranch_proxy:close(ConnectedProxySocket),
+
+    {error, closed_on_ssl_accept} = accept_socket().
+
 accept_loop(ListenProxySocket, TestPid) ->
-    {ok, AcceptedProxySocket} = ranch_proxy_ssl:accept(ListenProxySocket,
-                                                       ?TEST_TIMEOUT),
-    ok = ranch_proxy_ssl:controlling_process(AcceptedProxySocket, TestPid),
-    TestPid ! {accepted_socket, AcceptedProxySocket}.
+    case ranch_proxy_ssl:accept(ListenProxySocket, ?TEST_TIMEOUT) of
+        {ok, AcceptedProxySocket} ->
+            ok = ranch_proxy_ssl:controlling_process(AcceptedProxySocket, TestPid),
+            TestPid ! {accepted_socket, AcceptedProxySocket};
+        {error, Reason} ->
+            TestPid ! {error, Reason}
+    end.
 
 accept_socket() ->
     receive
         {accepted_socket, AcceptedProxySocket} ->
             ranch_proxy_ssl:accept_ack(AcceptedProxySocket, ?TEST_TIMEOUT),
-            {ok, AcceptedProxySocket}
+            {ok, AcceptedProxySocket};
+        {error, Reason} ->
+            {error, Reason}
     after ?TEST_TIMEOUT ->
             throw({error, 'timeout waiting for accept socket'})
     end.
