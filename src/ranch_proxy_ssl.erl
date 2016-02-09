@@ -31,7 +31,9 @@
          listen_port/1,
          match_port/1,
          connection_info/1,
-         connection_info/2
+         connection_info/2,
+         ssl_connection_information/1,
+         ssl_connection_information/2
         ]).
 
 -type proxy_opts() :: ranch_proxy_protocol:proxy_opts().
@@ -201,6 +203,24 @@ connection_info(#ssl_socket{proxy_socket=ProxySocket}) ->
 -spec connection_info(ssl_socket(), [protocol | cipher_suite | sni_hostname]) -> {ok, list()}.
 connection_info(#ssl_socket{proxy_socket=ProxySocket}, Items) ->
     ranch_proxy_protocol:connection_info(ProxySocket, Items).
+
+%% @doc Expose SSL-only options regarding the current live SSL connection for
+%% introspection purposes.
+%% This callback does not make sense for others protocols of this library,
+%% since non-SSL connections should have none of this information within them.
+%%
+%% It is therefore distinct from `connection_info/1-2' whose purpose is
+%% to extract PROXY-level information, whereas this is a tunnel to
+%% `ssl:connection_information/1-2', which contains SSL-level protocol data.
+-spec ssl_connection_information(ssl_socket()) -> {ok, list()}.
+ssl_connection_information(Socket = #ssl_socket{upgraded=true}) ->
+    Bearer = bearer_port(Socket),
+    ssl:connection_information(Bearer).
+
+-spec ssl_connection_information(ssl_socket(), [protocol | cipher_suite | sni_hostname]) -> {ok, list()}.
+ssl_connection_information(Socket = #ssl_socket{upgraded=true}, Items) ->
+    Bearer = bearer_port(Socket),
+    ssl:connection_information(Bearer, Items).
 
 -spec opts_from_socket(atom(), ssl_socket()) ->
                               ranch_proxy_protocol:proxy_opts().
