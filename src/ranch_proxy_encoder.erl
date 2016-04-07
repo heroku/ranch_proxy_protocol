@@ -5,7 +5,7 @@
 -include("ranch_proxy.hrl").
 
 -type opts() :: [{negotiated_protocol, binary()}
-                |{protocol, sslv3 | tslv1 | 'tlsv1.1' | 'tlsv1.2'}
+                |{protocol, sslv3 | tlsv1 | 'tlsv1.1' | 'tlsv1.2'}
                 |{sni_hostname, iodata()}
                 |{verify, verify_peer | verify_none}
                 ].
@@ -109,7 +109,7 @@ ssl_record(Proto, List) ->
     Verify = <<(bnot ClientCert):32>>,
     VsnStr = case Proto of
         ssl3 -> <<"SSL 3.0">>;
-        tslv1 -> <<"TLS 1.0">>;
+        tlsv1 -> <<"TLS 1.0">>;
         'tlsv1.1' -> <<"TLS 1.1">>;
         'tlsv1.2' -> <<"TLS 1.2">>
     end,
