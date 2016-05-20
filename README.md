@@ -36,7 +36,7 @@ a third tuple containing proxy protocol information:
                                 {dest_address, inet:ip_address()} |
                                 {source_port, inet:port_number()} |
                                 {dest_port, inet:port_number()}].
--spec proxyname(proxy_socket()) -> 
+-spec proxyname(proxy_socket()) ->
                        {ok, proxy_protocol_info()} | {error, atom()}.
 ```
 
@@ -45,8 +45,7 @@ a third tuple containing proxy protocol information:
 Sure why don't you
 
 ``` bash
-$ rebar get-deps compile -C rebar.config.test
-$ rebar compile ct skip_deps=true -C rebar.config.test
+$ rebar3 ct
 ```
 
 # License
