@@ -176,10 +176,19 @@ connect(Transport, Host, Port, Opts, ProxyOpts) when is_integer(Port) ->
             {error, Error}
     end.
 
--spec recv(transport(), proxy_socket(), non_neg_integer(), non_neg_integer()) ->
+-spec recv(transport(), proxy_socket(), non_neg_integer(), timeout()) ->
                   {ok, any()} | {error, closed | atom()}.
+-ifndef(ssl_recv_zero).
+%% This clause only exists because Erlang =< 18.3.3's ssl:recv
+%% function cannot handle a timeout of 0.
+recv(ranch_ssl, #proxy_socket{csocket=Socket}, Length, 0) ->
+    ranch_ssl:recv(Socket, Length, 1);
 recv(Transport, #proxy_socket{csocket=Socket}, Length, Timeout) ->
     Transport:recv(Socket, Length, Timeout).
+-else.
+recv(Transport, #proxy_socket{csocket=Socket}, Length, Timeout) ->
+    Transport:recv(Socket, Length, Timeout).
+-endif.
 
 -spec send(transport(), proxy_socket(), iodata()) -> ok | {error, atom()}.
 send(Transport, #proxy_socket{csocket=Socket}, Packet) ->
