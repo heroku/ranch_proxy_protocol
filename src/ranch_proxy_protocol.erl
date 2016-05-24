@@ -85,10 +85,27 @@ maybe_add_proxy_v2_info(CSocket, ConnectionInfo) ->
            verify
           ]) of
         {ok, AdditionalInfo} ->
-            AdditionalInfo ++ ConnectionInfo;
+            ensure_binary_sni_hostname(AdditionalInfo)
+                ++ ConnectionInfo;
         _ ->
             ConnectionInfo
     end.
+
+%% This function could be adjusted in the future to handle other
+%% transformations on the ssl:connection_information, in which case it
+%% should probably be renamed
+-spec ensure_binary_sni_hostname([proplists:property()]) ->
+                                        [proplists:property()].
+ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props])
+  when is_binary(Hostname) ->
+    [{sni_hostname, Hostname}|ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props]) ->
+    [{sni_hostname, list_to_binary(Hostname)}
+     |ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([Head|Props]) ->
+    [Head|ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([]) -> [].
+
 
 -spec listen(transport(), opts()) -> {ok, proxy_socket()} | {error, atom()}.
 listen(Transport, Opts) ->
