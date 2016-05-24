@@ -63,7 +63,49 @@ get_csocket(#proxy_socket{csocket = CSocket}) ->
 
 -spec set_csocket(proxy_socket(), port()|ssl:sslsocket()) -> proxy_socket().
 set_csocket(ProxySocket, NewCSocket) ->
-    ProxySocket#proxy_socket{csocket = NewCSocket}.
+    ProxySocket#proxy_socket{
+      csocket = NewCSocket,
+      connection_info=maybe_add_proxy_v2_info(
+                        NewCSocket,
+                        ProxySocket#proxy_socket.connection_info)
+     }.
+
+-spec maybe_add_proxy_v2_info(port()|ssl:sslsocket(), list()) -> list().
+maybe_add_proxy_v2_info(CSocket, ConnectionInfo)
+  when is_port(CSocket) ->
+    ConnectionInfo;
+maybe_add_proxy_v2_info(CSocket, ConnectionInfo) ->
+    case
+        ssl:connection_information(
+          CSocket,
+          [
+           negotiated_protocol,
+           protocol,
+           sni_hostname,
+           verify
+          ]) of
+        {ok, AdditionalInfo} ->
+            ensure_binary_sni_hostname(AdditionalInfo)
+                ++ ConnectionInfo;
+        _ ->
+            ConnectionInfo
+    end.
+
+%% This function could be adjusted in the future to handle other
+%% transformations on the ssl:connection_information, in which case it
+%% should probably be renamed
+-spec ensure_binary_sni_hostname([proplists:property()]) ->
+                                        [proplists:property()].
+ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props])
+  when is_binary(Hostname) ->
+    [{sni_hostname, Hostname}|ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props]) ->
+    [{sni_hostname, list_to_binary(Hostname)}
+     |ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([Head|Props]) ->
+    [Head|ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([]) -> [].
+
 
 -spec listen(transport(), opts()) -> {ok, proxy_socket()} | {error, atom()}.
 listen(Transport, Opts) ->
