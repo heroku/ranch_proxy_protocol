@@ -65,31 +65,30 @@ get_csocket(#proxy_socket{csocket = CSocket}) ->
 set_csocket(ProxySocket, NewCSocket) ->
     ProxySocket#proxy_socket{
       csocket = NewCSocket,
-      connection_info=maybe_add_sni_hostname(NewCSocket,
-                                             ProxySocket#proxy_socket.connection_info)
+      connection_info=maybe_add_proxy_v2_info(
+                        NewCSocket,
+                        ProxySocket#proxy_socket.connection_info)
      }.
 
--spec maybe_add_sni_hostname(port()|ssl:sslsocket(), list()) -> list().
-maybe_add_sni_hostname(CSocket, ConnectionInfo)
+-spec maybe_add_proxy_v2_info(port()|ssl:sslsocket(), list()) -> list().
+maybe_add_proxy_v2_info(CSocket, ConnectionInfo)
   when is_port(CSocket) ->
     ConnectionInfo;
-maybe_add_sni_hostname(CSocket, ConnectionInfo) ->
-    case {
-      proplists:is_defined(sni_hostname, ConnectionInfo),
-      ssl:connection_information(CSocket, [sni_hostname]) } of
-        {true, _} ->
-            ConnectionInfo;
-        {false, {ok, []}} ->
-            ConnectionInfo;
-        {false, {ok, [{sni_hostname, Hostname}]}} ->
-            BinaryHostname  =
-                case is_binary(Hostname) of
-                    true -> Hostname;
-                    false -> list_to_binary(Hostname)
-                end,
-            [{sni_hostname, BinaryHostname}|ConnectionInfo]
+maybe_add_proxy_v2_info(CSocket, ConnectionInfo) ->
+    case
+        ssl:connection_information(
+          CSocket,
+          [
+           negotiated_protocol,
+           protocol,
+           sni_hostname,
+           verify
+          ]) of
+        {ok, AdditionalInfo} ->
+            AdditionalInfo ++ ConnectionInfo;
+        _ ->
+            ConnectionInfo
     end.
-
 
 -spec listen(transport(), opts()) -> {ok, proxy_socket()} | {error, atom()}.
 listen(Transport, Opts) ->
