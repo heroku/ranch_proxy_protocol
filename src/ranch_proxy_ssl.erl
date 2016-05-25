@@ -241,41 +241,23 @@ upgrade_to_ssl(ProxySocket, Opts) ->
             {error, Error}
     end.
 
-filter_ssl_opts([], SslOpts, SocketOpts) ->
-    {SslOpts, SocketOpts};
-filter_ssl_opts([{Key, _}=SslOpt|Rest], SslOpts, SocketOpts) when
-      Key == verify;
-      Key == verify_fun;
-      Key == fail_if_no_peer_cert;
-      Key == depth;
-      Key == cert;
-      Key == certfile;
-      Key == key;
-      Key == keyfile;
-      Key == password;
-      Key == cacerts;
-      Key == cacertfile;
-      Key == dh;
-      Key == dhfile;
-      Key == ciphers;
-      Key == user_lookup_fun;
-      Key == psk_identity;
-      Key == srp_identity;
-      Key == ssl_imp;
-      Key == reuse_sessions;
-      Key == reuse_session;
-      Key == next_protocols_advertised;
-      Key == client_preferred_next_protocols;
-      Key == client;
-      Key == log_alert;
-      Key == server_name_indication;
-      Key == alpn_preferred_protocols;
-      Key == alpn_advertised_protocols;
-      Key == client_preferred_next_protocols;
-      Key == sni_fun;
-      Key == sni_hosts;
-      Key == fallback;
-      Key == honor_cipher_order ->
-    filter_ssl_opts(Rest, [SslOpt|SslOpts], SocketOpts);
-filter_ssl_opts([SocketOpt|Rest], SslOpts, SocketOpts) ->
-    filter_ssl_opts(Rest, SslOpts, [SocketOpt|SocketOpts]).
+filter_ssl_opts([], SslOpts, SocketOpts) -> {SslOpts, SocketOpts};
+filter_ssl_opts([{Key, _}=Opt|Rest], SslOpts, SocketOpts) ->
+    Keys = [
+        alpn_advertised_protocols, alpn_preferred_protocols, cacertfile,
+        cacerts, cert, certfile, ciphers, client,
+        client_preferred_next_protocols, client_renegotiation,
+        crl_check, crl_cache, depth, dh, dhfile,
+        fail_if_no_peer_cert, fallback, hibernate_after, honor_cipher_order,
+        key, keyfile, next_protocols_advertised, log_alert, partial_chain,
+        password, psk_identity, reuse_session, reuse_sessions,
+        secure_renegotiate, send_timeout, send_timeout_close,
+        server_name_indication, sni_fun, sni_hosts, srp_identity, ssl_imp,
+        user_lookup_fun, verify, verify_fun, versions
+    ],
+    case lists:member(Key, Keys) of
+        true ->
+            filter_ssl_opts(Rest, [Opt|SslOpts], SocketOpts);
+        false ->
+            filter_ssl_opts(Rest, SslOpts, [Opt|SocketOpts])
+    end.
