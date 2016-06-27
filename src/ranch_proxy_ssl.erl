@@ -75,7 +75,8 @@ accept(#ssl_socket{proxy_socket = ProxySocket,
     case ranch_proxy:accept(ProxySocket, Timeout) of
         {ok, ProxySocket1} ->
             CSocket = ranch_proxy_protocol:get_csocket(ProxySocket1),
-            case ssl:ssl_accept(CSocket, Opts, Timeout) of
+            SSLOpts = application:get_env(ranch_proxy_protocol, ssl_accept_opts, []),
+            case ssl:ssl_accept(CSocket, SSLOpts++Opts, Timeout) of
                 {ok, SslSocket} ->
                     ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
                                                                     SslSocket),
