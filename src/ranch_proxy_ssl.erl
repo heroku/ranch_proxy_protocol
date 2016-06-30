@@ -244,38 +244,48 @@ upgrade_to_ssl(ProxySocket, Opts) ->
 filter_ssl_opts([], SslOpts, SocketOpts) ->
     {SslOpts, SocketOpts};
 filter_ssl_opts([{Key, _}=SslOpt|Rest], SslOpts, SocketOpts) when
-      Key == verify;
-      Key == verify_fun;
-      Key == fail_if_no_peer_cert;
-      Key == depth;
+      Key == alpn_advertised_protocols;
+      Key == alpn_preferred_protocols;
+      Key == beast_mitigation;
+      Key == cacertfile;
+      Key == cacerts;
       Key == cert;
       Key == certfile;
-      Key == key;
-      Key == keyfile;
-      Key == password;
-      Key == cacerts;
-      Key == cacertfile;
+      Key == ciphers;
+      Key == client;
+      Key == client_preferred_next_protocols;
+      Key == client_preferred_next_protocols;
+      Key == client_renegotiation;
+      Key == crl_cache;
+      Key == crl_check;
+      Key == depth;
       Key == dh;
       Key == dhfile;
-      Key == ciphers;
-      Key == user_lookup_fun;
-      Key == psk_identity;
-      Key == srp_identity;
-      Key == ssl_imp;
-      Key == reuse_sessions;
-      Key == reuse_session;
-      Key == next_protocols_advertised;
-      Key == client_preferred_next_protocols;
-      Key == client;
+      Key == fail_if_no_peer_cert;
+      Key == fallback;
+      Key == hibernate_after;
+      Key == honor_cipher_order;
+      Key == key;
+      Key == keyfile;
       Key == log_alert;
+      Key == next_protocols_advertised;
+      Key == padding_check;
+      Key == partial_chain;
+      Key == password;
+      Key == psk_identity;
+      Key == reuse_session;
+      Key == reuse_sessions;
+      Key == secure_renegotiate;
       Key == server_name_indication;
-      Key == alpn_preferred_protocols;
-      Key == alpn_advertised_protocols;
-      Key == client_preferred_next_protocols;
+      Key == signature_algs;
       Key == sni_fun;
       Key == sni_hosts;
-      Key == fallback;
-      Key == honor_cipher_order ->
+      Key == srp_identity;
+      Key == ssl_imp;
+      Key == user_lookup_fun;
+      Key == verify;
+      Key == verify_fun;
+      Key == versions ->
     filter_ssl_opts(Rest, [SslOpt|SslOpts], SocketOpts);
 filter_ssl_opts([SocketOpt|Rest], SslOpts, SocketOpts) ->
     filter_ssl_opts(Rest, SslOpts, [SocketOpt|SocketOpts]).
