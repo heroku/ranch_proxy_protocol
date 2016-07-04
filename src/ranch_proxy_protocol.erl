@@ -99,9 +99,13 @@ maybe_add_proxy_v2_info(CSocket, ConnectionInfo) ->
 ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props])
   when is_binary(Hostname) ->
     [{sni_hostname, Hostname}|ensure_binary_sni_hostname(Props)];
-ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props]) ->
+ensure_binary_sni_hostname([{sni_hostname, Hostname}|Props])
+  when is_list(Hostname) ->
     [{sni_hostname, list_to_binary(Hostname)}
      |ensure_binary_sni_hostname(Props)];
+ensure_binary_sni_hostname([{sni_hostname, undefined}|Props]) ->
+    %% Call was made without SNI
+    ensure_binary_sni_hostname(Props);
 ensure_binary_sni_hostname([Head|Props]) ->
     [Head|ensure_binary_sni_hostname(Props)];
 ensure_binary_sni_hostname([]) -> [].
