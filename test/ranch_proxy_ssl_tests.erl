@@ -18,7 +18,26 @@ ranch_proxy_ssl_test_() ->
                                     fun ?MODULE:accept_error_closed_on_ssl_accept_test_/1,
                                     fun ?MODULE:send_and_recv_test_/1,
                                     fun ?MODULE:sendfile_and_recv_test_/1,
-                                    fun ?MODULE:sendopts_test_/1
+                                    fun ?MODULE:sendopts_test_/1,
+                                    fun ?MODULE:conf_no_conflict_test_/1
+                                   ]]}
+     end}.
+
+ranch_proxy_ssl_conf_test_() ->
+    {setup,
+     fun setup_ssl/0,
+     fun teardown_ssl/1,
+     fun(_) ->
+             {foreach, fun setup_conf_test/0,
+              fun teardown_conf_test/1,
+              [{with, [T]} || T <- [fun ?MODULE:messages_test_/1,
+                                    fun ?MODULE:secure_test_/1,
+                                    fun ?MODULE:accept_and_connect_test_/1,
+                                    fun ?MODULE:accept_error_closed_on_ssl_accept_test_/1,
+                                    fun ?MODULE:send_and_recv_test_/1,
+                                    fun ?MODULE:sendfile_and_recv_test_/1,
+                                    fun ?MODULE:sendopts_test_/1,
+                                    fun ?MODULE:conf_no_conflict_test_/1
                                    ]]}
      end}.
 
@@ -34,17 +53,41 @@ teardown_ssl(Apps) ->
 
 setup_test() ->
     {_, Cert, Key} = ct_helper:make_certs(),
+    {_, CertSNI, KeySNI} = ct_helper:make_certs(),
+    SNIFun = fun(_Hostname) -> [{cert,CertSNI},{key,KeySNI}] end,
     {ok, ListenProxySocket} = ranch_proxy_ssl:listen([{cert, Cert},
-                                                      {key, Key}]),
+                                                      {key, Key},
+                                                      {sni_fun, SNIFun}]),
     ListenPort = ranch_proxy_ssl:listen_port(ListenProxySocket),
     {ok, {Address, Port}} = inet:sockname(ListenPort),
     #{listen_socket => ListenProxySocket,
       address       => Address,
       port          => Port,
       cert          => Cert,
-      key           => Key}.
+      key           => Key,
+      sni_key       => KeySNI}.
 
 teardown_test(_) ->
+    ok.
+
+setup_conf_test() ->
+    {_, Cert, Key} = ct_helper:make_certs(),
+    {_, CertSNI, KeySNI} = ct_helper:make_certs(),
+    SNIFun = fun(_Hostname) -> [{cert,CertSNI},{key,KeySNI}] end,
+    application:set_env(ranch_proxy_protocol, ssl_accept_opts,
+                        [{cert, Cert},{key, Key}]),
+    {ok, ListenProxySocket} = ranch_proxy_ssl:listen([{sni_fun, SNIFun}]),
+    ListenPort = ranch_proxy_ssl:listen_port(ListenProxySocket),
+    {ok, {Address, Port}} = inet:sockname(ListenPort),
+    #{listen_socket => ListenProxySocket,
+      address       => Address,
+      port          => Port,
+      cert          => Cert,
+      key           => Key,
+      sni_key       => KeySNI}.
+
+teardown_conf_test(_) ->
+    application:set_env(ranch_proxy_protocol, ssl_accept_opts, []),
     ok.
 
 %% TESTS
@@ -94,6 +137,19 @@ sendopts_test_(State) ->
     ?assertEqual({ok, [{delay_send, true}]},
                  ssl:getopts(AcceptPort, [delay_send])).
 
+conf_no_conflict_test_(State=#{key := Key, sni_key := KeySNI}) ->
+    {AcceptProxySocket, ConnectedProxySocket} = accept_and_connect_sni(State, "localhost"),
+    % Send something
+    Body = <<10,11>>,
+    ?assertEqual(ok, ranch_proxy_ssl:send(ConnectedProxySocket, Body)),
+    % Receive it on the other end
+    ?assertEqual({ok, Body}, ranch_proxy_ssl:recv(AcceptProxySocket, 2,
+                                              ?TEST_TIMEOUT)),
+    ?assertEqual({ok,[{key, KeySNI}]},
+                 ranch_proxy_ssl:ssl_connection_information(AcceptProxySocket, [key])),
+    ?assertNotEqual({ok,[{key, Key}]},
+                    ranch_proxy_ssl:ssl_connection_information(AcceptProxySocket, [key])).
+
 % Internal
 accept(ListenProxySocket) ->
     % Spawn the accept loop
@@ -114,6 +170,23 @@ accept_and_connect(#{listen_socket := ListenProxySocket,
     {ok, ConnectedProxySocket} = ranch_proxy_ssl:connect(Address, Port,
                                                          [{cert, Cert},
                                                           {key, Key}],
+                                                         ProxyOptions),
+    % Get the socket
+    {ok, AcceptedProxySocket} = accept_socket(),
+    {AcceptedProxySocket, ConnectedProxySocket}.
+
+accept_and_connect_sni(#{listen_socket := ListenProxySocket,
+                         address       := Address,
+                         port          := Port,
+                         cert          := Cert,
+                         key           := Key}, Domain) ->
+    ProxyOptions = accept(ListenProxySocket),
+
+    % Connect to the server
+    {ok, ConnectedProxySocket} = ranch_proxy_ssl:connect(Address, Port,
+                                                         [{cert, Cert},
+                                                          {key, Key},
+                                                          {server_name_indication, Domain}],
                                                          ProxyOptions),
     % Get the socket
     {ok, AcceptedProxySocket} = accept_socket(),
