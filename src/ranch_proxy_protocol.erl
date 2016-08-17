@@ -134,9 +134,9 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
             ProxySocket = #proxy_socket{lsocket = LSocket,
                                         csocket = CSocket,
                                         opts = Opts},
-            ok = setopts(Transport, ProxySocket, [{active, once}, {packet, line}]),
-            receive
-                {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
+            ok = setopts(Transport, ProxySocket, [{packet, line}]),
+            case Transport:recv(CSocket, 0, NextWait) of
+                {ok, <<"PROXY ", ProxyInfo/binary>>} ->
                     case parse_proxy_protocol_v1(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
                             reset_socket_opts(Transport, ProxySocket, Opts),
@@ -152,7 +152,7 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                             close(Transport, ProxySocket),
                             {error, not_proxy_protocol}
                     end;
-                {_, CSocket, <<"\r\n">>} ->
+                {ok, <<"\r\n">>} ->
                     ok = setopts(Transport, ProxySocket, [{packet, raw}]),
                     {ok, ProxyHeader} = Transport:recv(CSocket, 14, 1000),
                     case parse_proxy_protocol_v2(<<"\r\n", ProxyHeader/binary>>) of
@@ -179,12 +179,12 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                             close(Transport, ProxySocket),
                             {error, not_supported_v2}
                     end;
+                {error, timeout} ->
+                    close(Transport, ProxySocket),
+                    {error, {timeout, proxy_handshake}};
                 Other ->
                     close(Transport, ProxySocket),
                     {error, Other}
-            after NextWait ->
-                    close(Transport, ProxySocket),
-                    {error, {timeout, proxy_handshake}}
             end;
         {error, Error} ->
             {error, Error}
