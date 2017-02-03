@@ -134,20 +134,19 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
             ProxySocket = #proxy_socket{lsocket = LSocket,
                                         csocket = CSocket,
                                         opts = Opts},
-            DefaultValuesOfModifiedOptions = [{active, false}, {packet, 0}],
             ok = setopts(Transport, ProxySocket, [{active, once}, {packet, line}]),
             receive
                 {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
                     case parse_proxy_protocol_v1(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
-                            reset_socket_opts(Transport, ProxySocket, Opts, DefaultValuesOfModifiedOptions),
+                            reset_socket_opts(Transport, ProxySocket, Opts),
                             {ok, ProxySocket#proxy_socket{inet_version = InetVersion,
                                                           source_address = SourceAddress,
                                                           dest_address = DestAddress,
                                                           source_port = SourcePort,
                                                           dest_port = DestPort}};
                         unknown_peer ->
-                            reset_socket_opts(Transport, ProxySocket, Opts, DefaultValuesOfModifiedOptions),
+                            reset_socket_opts(Transport, ProxySocket, Opts),
                             {ok, ProxySocket};
                         not_proxy_protocol ->
                             close(Transport, ProxySocket),
@@ -480,9 +479,16 @@ parse_ips([Ip|Ips], Retval) ->
             {error, invalid_address}
     end.
 
-reset_socket_opts(Transport, ProxySocket, RequestedOpts, DefaultsOfModifiedOptions) ->
-    setopts(Transport, ProxySocket, DefaultsOfModifiedOptions),
-    setopts(Transport, ProxySocket, RequestedOpts).
+reset_socket_opts(Transport, ProxySocket, Opts) ->
+    ChangedDefaults = [{active, false}, {packet, raw}],
+    Opts2 = [begin
+                 case lists:keyfind(Key, 1, Opts) of
+                     false  -> {Key, Value};
+                     Option -> Option
+                 end
+             end
+        || {Key, Value} <- ChangedDefaults],
+    setopts(Transport, ProxySocket, Opts2).
 
 get_next_timeout(_, _, infinity) ->
     %% Never leave `infinity' in place. This may be valid for socket
