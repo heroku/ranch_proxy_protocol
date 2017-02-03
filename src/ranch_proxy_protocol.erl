@@ -134,19 +134,20 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
             ProxySocket = #proxy_socket{lsocket = LSocket,
                                         csocket = CSocket,
                                         opts = Opts},
+            DefaultValuesOfModifiedOptions = [{active, false}, {packet, 0}],
             ok = setopts(Transport, ProxySocket, [{active, once}, {packet, line}]),
             receive
                 {_, CSocket, <<"PROXY ", ProxyInfo/binary>>} ->
                     case parse_proxy_protocol_v1(ProxyInfo) of
                         {InetVersion, SourceAddress, DestAddress, SourcePort, DestPort} ->
-                            reset_socket_opts(Transport, ProxySocket, Opts),
+                            reset_socket_opts(Transport, ProxySocket, Opts, DefaultValuesOfModifiedOptions),
                             {ok, ProxySocket#proxy_socket{inet_version = InetVersion,
                                                           source_address = SourceAddress,
                                                           dest_address = DestAddress,
                                                           source_port = SourcePort,
                                                           dest_port = DestPort}};
                         unknown_peer ->
-                            reset_socket_opts(Transport, ProxySocket, Opts),
+                            reset_socket_opts(Transport, ProxySocket, Opts, DefaultValuesOfModifiedOptions),
                             {ok, ProxySocket};
                         not_proxy_protocol ->
                             close(Transport, ProxySocket),
@@ -479,15 +480,9 @@ parse_ips([Ip|Ips], Retval) ->
             {error, invalid_address}
     end.
 
-reset_socket_opts(Transport, ProxySocket, Opts) ->
-    Opts2 = ranch:filter_options(Opts, [active,buffer,delay_send,deliver,dontroute,
-                                        exit_on_close,header,high_msgq_watermark,
-                                        high_watermark,keepalive,linger,low_msgq_watermark,
-                                        low_watermark,mode,nodelay,packet,packet_size,priority,
-                                        recbuf,reuseaddr,send_timeout,send_timeout_close,sndbuf,tos],
-                                 [binary, {active, false}, {packet, raw},
-                                  {reuseaddr, true}, {nodelay, true}]),
-    setopts(Transport, ProxySocket, Opts2).
+reset_socket_opts(Transport, ProxySocket, RequestedOpts, DefaultsOfModifiedOptions) ->
+    setopts(Transport, ProxySocket, DefaultsOfModifiedOptions),
+    setopts(Transport, ProxySocket, RequestedOpts).
 
 get_next_timeout(_, _, infinity) ->
     %% Never leave `infinity' in place. This may be valid for socket
