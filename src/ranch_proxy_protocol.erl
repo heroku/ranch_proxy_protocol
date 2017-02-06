@@ -481,11 +481,9 @@ parse_ips([Ip|Ips], Retval) ->
 
 reset_socket_opts(Transport, ProxySocket, Opts) ->
     ChangedDefaults = [{active, false}, {packet, raw}],
-    Opts2 = [begin
-                 case lists:keyfind(Key, 1, Opts) of
-                     false  -> {Key, Value};
-                     Option -> Option
-                 end
+    Opts2 = [case lists:keyfind(Key, 1, Opts) of
+                 false  -> {Key, Value};
+                 Option -> Option
              end
         || {Key, Value} <- ChangedDefaults],
     setopts(Transport, ProxySocket, Opts2).
