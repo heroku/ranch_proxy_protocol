@@ -1,4 +1,6 @@
-[{<<"ranch">>,
-  {git,"https://github.com/ninenines/ranch.git",
-       {ref,"a004ad710eddd0c21aaccc30d5633a76b06164b5"}},
-  0}].
+{"1.1.0",
+[{<<"ranch">>,{pkg,<<"ranch">>,<<"1.3.2">>},0}]}.
+[
+{pkg_hash,[
+ {<<"ranch">>, <<"E4965A144DC9FBE70E5C077C65E73C57165416A901BD02EA899CFD95AA890986">>}]}
+].

@@ -9,5 +9,6 @@
                   ranch
                  ]},
   {env, [{proxy_protocol_timeout, 55000}, % Never put 'infinity'
-         {ssl_accept_opts, []}]}
+         {ssl_accept_opts, []}]},
+  {licenses, ["BSD 3-Clause"]}
  ]}.
