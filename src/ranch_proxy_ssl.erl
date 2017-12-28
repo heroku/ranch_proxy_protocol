@@ -270,6 +270,7 @@ filter_ssl_opts([{Key, _}=SslOpt|Rest], SslOpts, SocketOpts) when
       Key == depth;
       Key == dh;
       Key == dhfile;
+      Key == eccs;
       Key == fail_if_no_peer_cert;
       Key == fallback;
       Key == hibernate_after;
