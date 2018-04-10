@@ -15,6 +15,9 @@
          sendfile/4,
          sendfile/5,
          setopts/2,
+         getopts/2,
+         getstat/1,
+         getstat/2,
          controlling_process/2,
          peername/1,
          proxyname/1,
@@ -103,6 +106,18 @@ sendfile(ProxySocket, Filename, Offset, Bytes, Opts) ->
 -spec setopts(proxy_socket(), list()) -> ok | {error, atom()}.
 setopts(ProxySocket, Opts) ->
     ranch_proxy_protocol:setopts(?TRANSPORT, ProxySocket, Opts).
+
+-spec getopts(proxy_socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getopts(ProxySocket, Opts) ->
+    ranch_proxy_protocol:getopts(?TRANSPORT, ProxySocket, Opts).
+
+-spec getstat(proxy_socket()) -> {ok, list()} | {error, atom()}.
+getstat(ProxySocket) ->
+    ranch_proxy_protocol:getstat(?TRANSPORT, ProxySocket).
+
+-spec getstat(proxy_socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getstat(ProxySocket, OptionNames) ->
+    ranch_proxy_protocol:getstat(?TRANSPORT, ProxySocket, OptionNames).
 
 -spec controlling_process(proxy_socket(), pid())
                          -> ok | {error, closed | not_owner | atom()}.
