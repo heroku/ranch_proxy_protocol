@@ -11,6 +11,9 @@
          send/3,
          sendfile/6,
          setopts/3,
+         getopts/3,
+         getstat/2,
+         getstat/3,
          controlling_process/3,
          peername/2,
          proxyname/2,
@@ -251,6 +254,18 @@ sendfile(Transport, #proxy_socket{csocket=Socket}, Filename, Offset,
 -spec setopts(transport(), proxy_socket(), list()) -> ok | {error, atom()}.
 setopts(Transport, #proxy_socket{csocket=Socket}, Opts) ->
     Transport:setopts(Socket, Opts).
+
+-spec getopts(transport(), proxy_socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getopts(Transport, #proxy_socket{csocket=Socket}, Opts) ->
+    Transport:getopts(Socket, Opts).
+
+-spec getstat(transport(), proxy_socket()) -> {ok, list()} | {error, atom()}.
+getstat(Transport, #proxy_socket{csocket=Socket}) ->
+    Transport:getstat(Socket).
+
+-spec getstat(transport(), proxy_socket(), [atom()]) -> {ok, list()} | {error, atom()}.
+getstat(Transport, #proxy_socket{csocket=Socket}, OptionNames) ->
+    Transport:getstat(Socket, OptionNames).
 
 -spec controlling_process(transport() , proxy_socket(), pid()) ->
                                  ok | {error, closed | not_owner | atom()}.
