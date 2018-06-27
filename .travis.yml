@@ -1,0 +1,7 @@
+language: erlang
+otp_release:
+  - 20.3
+  - 21.0
+script: "rebar3 ct"
+sudo: false
+
