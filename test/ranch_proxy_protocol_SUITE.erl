@@ -13,6 +13,9 @@ init_per_suite(Config) ->
     application:load(ranch_proxy_protocol),
     Config.
 
+end_per_suite(_Config) ->
+    ok.
+
 init_per_testcase(new_connection, Config) ->
     Port = 9401,
     {ok, Pid} = ranch:start_listener(ranch_proxy_protocol_acceptor,
