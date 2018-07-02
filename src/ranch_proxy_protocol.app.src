@@ -10,5 +10,6 @@
                  ]},
   {env, [{proxy_protocol_timeout, 55000}, % Never put 'infinity'
          {ssl_accept_opts, []}]},
+  {links,[{"Github","https://github.com/heroku/ranch_proxy_protocol"}]},
   {licenses, ["BSD 3-Clause"]}
  ]}.
