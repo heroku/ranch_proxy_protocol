@@ -2,6 +2,6 @@ language: erlang
 otp_release:
   - 20.3
   - 21.0
-script: "rebar3 ct"
+script: rebar3 as test do ct, dialyzer
 sudo: false
 
