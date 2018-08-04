@@ -39,11 +39,11 @@
          ssl_connection_information/2
         ]).
 
+-dialyzer({nowarn_function, connect/4}).
+
 % Record manipulation
 -export([get_csocket/1]).
 
--type proxy_opts() :: ranch_proxy_protocol:proxy_opts().
--type proxy_socket() :: ranch_proxy_protocol:proxy_socket().
 -type proxy_protocol_info() :: ranch_proxy_protocol:proxy_protocol_info().
 -opaque ssl_socket() :: #ssl_socket{}.
 
@@ -62,7 +62,7 @@ name() -> proxy_protocol_ssl.
 -spec secure() -> boolean().
 secure() -> true.
 
--spec messages() -> tuple().
+-spec messages() -> {atom(),atom(),atom()}.
 messages() -> ranch_ssl:messages().
 
 -spec listen(ranch_ssl:opts()) -> {ok, ssl_socket()} | {error, atom()}.
@@ -77,10 +77,10 @@ listen(Opts) ->
             {error, Error}
     end.
 
--spec accept(proxy_socket(), timeout())
+-spec accept(ssl_socket(), timeout())
             -> {ok, ssl_socket()} | {error, closed | timeout | not_proxy_protocol |
                                      closed_on_ssl_accept |
-                                     {timeout, proxy_handshake} | atom()}.
+                                     timeout_proxy_handshake | atom()}.
 accept(#ssl_socket{proxy_socket = ProxySocket,
                    sslopts      = Opts} = ProxySslSocket, Timeout) ->
     case ranch_proxy:accept(ProxySocket, Timeout) of
@@ -116,7 +116,7 @@ connect(Host, Port, Opts) when is_integer(Port) ->
     connect(Host, Port, Opts, []).
 
 -spec connect(inet:ip_address() | inet:hostname(),
-              inet:port_number(), any(), proxy_opts())
+              inet:port_number(), any(), timeout() | infinity)
              -> {ok, ssl_socket()} | {error, atom()}.
 connect(Host, Port, Opts, ProxyOpts) when is_integer(Port) ->
     % Before connecting remove the SSL specific options.
@@ -246,8 +246,8 @@ ssl_connection_information(Socket = #ssl_socket{upgraded=true}, Items) ->
     Bearer = bearer_port(Socket),
     ssl:connection_information(Bearer, Items).
 
--spec opts_from_socket(atom(), ssl_socket()) ->
-                              ranch_proxy_protocol:proxy_opts().
+-spec opts_from_socket(atom(), ranch_proxy_protocol:proxy_socket())->
+                              {ok, ranch_proxy_protocol:proxy_opts()} | {error, any()}.
 opts_from_socket(Transport, Socket) ->
     ranch_proxy_protocol:opts_from_socket(Transport, Socket).
 

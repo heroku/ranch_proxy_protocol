@@ -32,7 +32,8 @@
          connection_info/2
         ]).
 
--type proxy_opts() :: ranch_proxy_protocol:proxy_opts().
+-dialyzer({nowarn_function, connect/4}).
+
 -type proxy_socket() :: ranch_proxy_protocol:proxy_socket().
 -type proxy_protocol_info() :: ranch_proxy_protocol:proxy_protocol_info().
 
@@ -44,7 +45,7 @@ name() -> proxy_protocol_tcp.
 -spec secure() -> boolean().
 secure() -> false.
 
--spec messages() -> tuple().
+-spec messages() -> {atom(),atom(),atom()}.
 messages() -> ?TRANSPORT:messages().
 
 -spec match_port(proxy_socket()) -> port().
@@ -57,9 +58,17 @@ listen(Opts) ->
 
 -spec accept(proxy_socket(), timeout())
             -> {ok, proxy_socket()} | {error, closed | timeout | not_proxy_protocol |
-                                       {timeout, proxy_handshake} | atom()}.
+                                       atom()}.
 accept(ProxySocket, Timeout) ->
-    ranch_proxy_protocol:accept(?TRANSPORT, ProxySocket, Timeout).
+    case ranch_proxy_protocol:accept(?TRANSPORT, ProxySocket, Timeout) of
+        {ok, _} = R1 ->
+            R1;
+        {error,{timeout, proxy_handshake}} ->
+            {error, timeout_proxy_handshake};
+        {error, Error} ->
+            {error, Error}
+    end.
+
 
 -spec accept_ack(proxy_socket(), timeout()) -> ok.
 accept_ack(ProxySocket, Timeout) ->
@@ -71,8 +80,8 @@ accept_ack(ProxySocket, Timeout) ->
 connect(Host, Port, Opts) when is_integer(Port) ->
     connect(Host, Port, Opts, []).
 
--spec connect(inet:ip_address() | inet:hostname(),
-              inet:port_number(), any(), proxy_opts())
+-spec connect(inet:ip_address() | inet:hostname() | atom() | string(),
+              inet:port_number(), ranch:opts(), timeout() | infinity )
              -> {ok, proxy_socket()} | {error, atom()}.
 connect(Host, Port, Opts, ProxyOpts) when is_integer(Port) ->
     ranch_proxy_protocol:connect(?TRANSPORT, Host, Port, Opts, ProxyOpts).
@@ -165,6 +174,6 @@ listen_port(ProxySocket) ->
     ranch_proxy_protocol:listen_port(?TRANSPORT, ProxySocket).
 
 -spec opts_from_socket(atom(), proxy_socket()) ->
-                              ranch_proxy_protocol:proxy_opts().
+                              {ok, ranch_proxy_protocol:proxy_opts()} | {error, any()}.
 opts_from_socket(Transport, Socket) ->
     ranch_proxy_protocol:opts_from_socket(Transport, Socket).

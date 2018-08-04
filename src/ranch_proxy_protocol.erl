@@ -34,13 +34,13 @@
 
 -type opts() :: ranch_ssl:opts()|ranch_tcp:opts().
 -record(proxy_socket, { lsocket :: inet:socket()|ssl:sslsocket(),
-                        csocket :: inet:socket()|ssl:sslsocket(),
-                        opts :: opts(),
-                        inet_version :: ipv4|ipv6,
-                        source_address :: inet:ip_address(),
-                        dest_address :: inet:ip_address(),
-                        source_port :: inet:port_number(),
-                        dest_port :: inet:port_number(),
+                        csocket :: inet:socket()|ssl:sslsocket() | undefined,
+                        opts :: opts() | undefined,
+                        inet_version :: ipv4|ipv6 | undefined,
+                        source_address :: inet:ip_address() | undefined,
+                        dest_address :: inet:ip_address() | undefined,
+                        source_port :: inet:port_number() | undefined,
+                        dest_port :: inet:port_number() | undefined,
                         connection_info = []}).
 -type transport() :: module().
 -type proxy_opts() :: [{source_address, inet:ip_address()} |
@@ -310,7 +310,7 @@ close(Transport, #proxy_socket{csocket=Socket}) ->
     Transport:close(Socket).
 
 -spec opts_from_socket(atom(), proxy_socket()) ->
-                              ranch_proxy_protocol:proxy_opts().
+                              {ok, ranch_proxy_protocol:proxy_opts()} | {error, any()}.
 opts_from_socket(Transport, Socket) ->
     case {source_from_socket(Transport, Socket),
           dest_from_socket(Transport, Socket)} of
@@ -359,7 +359,10 @@ get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 8,
     ipv6;
 get_protocol(SourceAddress, DestAddress) when tuple_size(SourceAddress) =:= 4,
                                               tuple_size(DestAddress) =:= 4 ->
-    ipv4.
+    ipv4;
+get_protocol(_, _) ->
+    error.
+
 
 parse_proxy_protocol_v1(<<"TCP", Proto:1/binary, _:1/binary, Info/binary>>) ->
     InfoStr = binary_to_list(Info),
