@@ -207,7 +207,7 @@ fail_timeout_clean(Config) ->
     {ok, Conn} = gen_tcp:connect({127,0,0,1}, Port, [{active,false}]),
     gen_tcp:send(Conn, <<"garbage data">>), % no CLRF may wait forever
     receive
-        {Acceptor, {error, {timeout, proxy_handshake}}} ->
+        {Acceptor, {error, timeout_proxy_handshake}} ->
             [] = ports(Acceptor)
     after 5000 ->
         error(timeout)
