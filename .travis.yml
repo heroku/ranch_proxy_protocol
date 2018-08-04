@@ -2,6 +2,8 @@ language: erlang
 otp_release:
   - 20.3
   - 21.0
-script: rebar3 as test do ct, dialyzer
+script: 
+- wget https://github.com/erlang/rebar3/releases/download/3.6.1/rebar3 && chmod +x rebar3
+- ./rebar3 as test do ct, dialyzer
 sudo: false
 
