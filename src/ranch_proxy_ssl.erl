@@ -87,7 +87,11 @@ accept(#ssl_socket{proxy_socket = ProxySocket,
         {ok, ProxySocket1} ->
             CSocket = ranch_proxy_protocol:get_csocket(ProxySocket1),
             SSLOpts = application:get_env(ranch_proxy_protocol, ssl_accept_opts, []),
-            case ssl:handshake(CSocket, SSLOpts++Opts, Timeout) of
+            Fun = case erlang:function_exported(ssl, handshake, 3) of
+                      true  -> handshake;
+                      false -> ssl_accept
+                  end,
+            case ssl:Fun(CSocket, SSLOpts++Opts, Timeout) of
                 {ok, SslSocket} ->
                     ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
                                                                     SslSocket),
