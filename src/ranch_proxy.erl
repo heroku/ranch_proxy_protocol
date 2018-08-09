@@ -7,6 +7,7 @@
          listen/1,
          accept/2,
          accept_ack/2,
+         handshake/3,
          connect/3,
          connect/4,
          recv/3,
@@ -63,7 +64,14 @@ accept(ProxySocket, Timeout) ->
 
 -spec accept_ack(proxy_socket(), timeout()) -> ok.
 accept_ack(ProxySocket, Timeout) ->
-    ranch_proxy_protocol:accept_ack(?TRANSPORT, ProxySocket, Timeout).
+    {ok, _} = handshake(ProxySocket, [], Timeout),
+    ok.
+
+-spec handshake(proxy_socket(), list(), timeout())
+	-> {ok, proxy_socket()} | {error, any()}.
+handshake(ProxySocket, _Opts, Timeout) ->
+    ranch_proxy_protocol:accept_ack(?TRANSPORT, ProxySocket, Timeout),
+    {ok, ProxySocket}.
 
 -spec connect(inet:ip_address() | inet:hostname(),
               inet:port_number(), any())
