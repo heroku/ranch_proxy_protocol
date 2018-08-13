@@ -49,6 +49,12 @@
 
 -define(TRANSPORT, ranch_ssl).
 
+-ifdef(OTP_RELEASE). %% Defined on OTP ≥ 21
+-define(SSL_HANDSHAKE(A,B,C), ssl:handshake(A,B,C)).
+-else.
+-define(SSL_HANDSHAKE(A,B,C), ssl:ssl_accept(A,B,C)).
+-endif.
+
 -export_type([ssl_socket/0]).
 
 %% Record manipulation API
@@ -87,7 +93,7 @@ accept(#ssl_socket{proxy_socket = ProxySocket,
         {ok, ProxySocket1} ->
             CSocket = ranch_proxy_protocol:get_csocket(ProxySocket1),
             SSLOpts = application:get_env(ranch_proxy_protocol, ssl_accept_opts, []),
-            case ssl:handshake(CSocket, SSLOpts++Opts, Timeout) of
+            case ?SSL_HANDSHAKE(CSocket, SSLOpts++Opts, Timeout) of
                 {ok, SslSocket} ->
                     ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
                                                                     SslSocket),
