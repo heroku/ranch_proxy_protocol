@@ -12,6 +12,7 @@
          listen/1,
          accept/2,
          accept_ack/2,
+         handshake/3,
          connect/3,
          connect/4,
          recv/3,
@@ -87,7 +88,11 @@ accept(#ssl_socket{proxy_socket = ProxySocket,
         {ok, ProxySocket1} ->
             CSocket = ranch_proxy_protocol:get_csocket(ProxySocket1),
             SSLOpts = application:get_env(ranch_proxy_protocol, ssl_accept_opts, []),
-            case ssl:handshake(CSocket, SSLOpts++Opts, Timeout) of
+            Fun = case erlang:function_exported(ssl, handshake, 3) of
+                      true  -> handshake;
+                      false -> ssl_accept
+                  end,
+            case ssl:Fun(CSocket, SSLOpts++Opts, Timeout) of
                 {ok, SslSocket} ->
                     ProxySocket2 = ranch_proxy_protocol:set_csocket(ProxySocket1,
                                                                     SslSocket),
@@ -103,11 +108,18 @@ accept(#ssl_socket{proxy_socket = ProxySocket,
     end.
 
 -spec accept_ack(ssl_socket(), timeout()) -> ok.
-accept_ack(#ssl_socket{proxy_socket = ProxySocket,
-                       upgraded = false}, Timeout) ->
-    ranch_proxy_protocol:accept_ack(?TRANSPORT, ProxySocket, Timeout);
-accept_ack(_, _) ->
+accept_ack(CSocket, Timeout) ->
+    {ok, _} = handshake(CSocket, [], Timeout),
     ok.
+
+-spec handshake(ssl_socket(), list(), timeout())
+	-> {ok, ssl_socket()} | {error, any()}.
+handshake(#ssl_socket{proxy_socket = ProxySocket,
+                      upgraded = false} = CSocket, _Opts, Timeout) ->
+    ranch_proxy_protocol:accept_ack(?TRANSPORT, ProxySocket, Timeout),
+    {ok, CSocket};
+handshake(CSocket, _Opts, _Timeout) ->
+    {ok, CSocket}.
 
 -spec connect(inet:ip_address() | inet:hostname(),
               inet:port_number(), any())
