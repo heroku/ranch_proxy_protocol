@@ -1,8 +1,19 @@
+# vim:sw=2:et:
+
 language: erlang
 otp_release:
   - 19.3
   - 20.3
   - 21.0
+env:
+  global:
+    - PATH=~/.cache/rebar3/bin:$PATH
+install:
+  - rebar3 local upgrade
+  # We apparently need to run it once before Travis picks it up, even if
+  # it's in the $PATH.
+  - PATH=~/.cache/rebar3/bin:$PATH rebar3 -v
+  - rebar3 report
 script:
   - rebar3 eunit
   - rebar3 ct
