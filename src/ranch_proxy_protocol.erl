@@ -413,12 +413,22 @@ pp2_type(?PP2_TYPE_ALPN) ->
     negotiated_protocol;
 pp2_type(?PP2_TYPE_AUTHORITY) ->
     authority;
+pp2_type(?PP2_TYPE_CRC32C) ->
+    crc32c;
+pp2_type(?PP2_TYPE_NOOP) ->
+    noop;
 pp2_type(?PP2_TYPE_SSL) ->
     ssl;
 pp2_type(?PP2_SUBTYPE_SSL_VERSION) ->
     protocol;
 pp2_type(?PP2_SUBTYPE_SSL_CN) ->
     sni_hostname;
+pp2_type(?PP2_SUBTYPE_SSL_CIPHER) ->
+    ssl_cipher;
+pp2_type(?PP2_SUBTYPE_SSL_SIG_ALG) ->
+    ssl_sig_alg;
+pp2_type(?PP2_SUBTYPE_SSL_KEY_ALG) ->
+    ssl_key_alg;
 pp2_type(?PP2_TYPE_NETNS) ->
     netns;
 pp2_type(_) ->

@@ -16,9 +16,14 @@
 %% TLV types for additional headers
 -define(PP2_TYPE_ALPN, 16#01).
 -define(PP2_TYPE_AUTHORITY, 16#02).
+-define(PP2_TYPE_CRC32C, 16#03).
+-define(PP2_TYPE_NOOP, 16#04).
 -define(PP2_TYPE_SSL, 16#20).
 -define(PP2_SUBTYPE_SSL_VERSION, 16#21).
 -define(PP2_SUBTYPE_SSL_CN, 16#22).
+-define(PP2_SUBTYPE_SSL_CIPHER, 16#23).
+-define(PP2_SUBTYPE_SSL_SIG_ALG, 16#24).
+-define(PP2_SUBTYPE_SSL_KEY_ALG, 16#25).
 -define(PP2_TYPE_NETNS, 16#30).
 
 %% SSL Client fields
