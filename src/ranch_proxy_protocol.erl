@@ -157,30 +157,34 @@ accept(Transport, #proxy_socket{lsocket = LSocket,
                     end;
                 {_, CSocket, <<"\r\n">>} ->
                     ok = setopts(Transport, ProxySocket, [{packet, raw}]),
-                    {ok, ProxyHeader} = Transport:recv(CSocket, 14, 1000),
-                    case parse_proxy_protocol_v2(<<"\r\n", ProxyHeader/binary>>) of
-                        {proxy, ipv4, _Protocol, Length} ->
-                            {ok, ProxyAddr} = Transport:recv(CSocket, Length, 1000),
-                            case ProxyAddr of
-                                <<SA1:8, SA2:8, SA3:8, SA4:8,
-                                  DA1:8, DA2:8, DA3:8, DA4:8,
-                                  SourcePort:16, DestPort:16, Rest/binary>> ->
-                                    SourceAddress = {SA1, SA2, SA3, SA4},
-                                    DestAddress = {DA1, DA2, DA3, DA4},
-                                    ConnectionInfo = parse_tlv(Rest),
-                                    {ok, ProxySocket#proxy_socket{inet_version = ipv4,
-                                                                  source_address = SourceAddress,
-                                                                  dest_address = DestAddress,
-                                                                  source_port = SourcePort,
-                                                                  dest_port = DestPort,
-                                                                  connection_info=ConnectionInfo}};
-                                _ ->
+                    case Transport:recv(CSocket, 14, 1000) of
+                        {error, _} = Error ->
+                            Error;
+                        {ok, ProxyHeader} ->
+                            case parse_proxy_protocol_v2(<<"\r\n", ProxyHeader/binary>>) of
+                                {proxy, ipv4, _Protocol, Length} ->
+                                    {ok, ProxyAddr} = Transport:recv(CSocket, Length, 1000),
+                                    case ProxyAddr of
+                                        <<SA1:8, SA2:8, SA3:8, SA4:8,
+                                          DA1:8, DA2:8, DA3:8, DA4:8,
+                                          SourcePort:16, DestPort:16, Rest/binary>> ->
+                                            SourceAddress = {SA1, SA2, SA3, SA4},
+                                            DestAddress = {DA1, DA2, DA3, DA4},
+                                            ConnectionInfo = parse_tlv(Rest),
+                                            {ok, ProxySocket#proxy_socket{inet_version = ipv4,
+                                                                          source_address = SourceAddress,
+                                                                          dest_address = DestAddress,
+                                                                          source_port = SourcePort,
+                                                                          dest_port = DestPort,
+                                                                          connection_info=ConnectionInfo}};
+                                        _ ->
+                                            close(Transport, ProxySocket),
+                                            {error, not_proxy_protocol}
+                                    end;
+                                _Unsupported ->
                                     close(Transport, ProxySocket),
-                                    {error, not_proxy_protocol}
-                            end;
-                        _Unsupported ->
-                            close(Transport, ProxySocket),
-                            {error, not_supported_v2}
+                                    {error, not_supported_v2}
+                            end
                     end;
                 Other ->
                     close(Transport, ProxySocket),
