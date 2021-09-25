@@ -385,7 +385,7 @@ parse_proxy_protocol_v1(_) ->
 %% and 1 full byte for the length of information regarding addresses and SSL (if any)
 %%
 %% 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 ....
-%% | version   |proxy/local|  inet[6]  |  TCP/UDP  | lenght of information  | info
+%% | version   |proxy/local|  inet[6]  |  TCP/UDP  | length of information  | info
 %%
 parse_proxy_protocol_v2(<<?HEADER, (?VSN):4, 0:4, X:4, Y:4, Len:16>>) ->
     {local, family(X), protocol(Y), Len};
